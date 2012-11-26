@@ -25,7 +25,7 @@
 #include "libtopology.h"
 #include "lldp.h"
 #include "probe_timer_table.h"
-
+#include "service_management.h"
 
 dlist_element *probe_timer_table;
 dlist_element *probe_timer_last;
@@ -165,6 +165,7 @@ reset_confirmed_state( probe_timer_entry *entry ) {
 
 void
 probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t port_no ) {
+debug( "!!!!%s!!!!", __func__ );
   int old_state = entry->state;
   switch ( entry->state ) {
     case PROBE_TIMER_STATE_INACTIVE:
@@ -188,7 +189,7 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
             reset_wait_state( entry );
           }
           else {
-	    entry->dirty = false;
+            entry->dirty = false;
           }
           break;
         default:
@@ -212,11 +213,11 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
           entry->to_datapath_id = *dpid;
           entry->to_port_no = port_no;
           entry->link_up = true;
-          bool ret = set_link_status( &link_status, NULL, NULL );
-          if ( ret ) {
-	    peer_link_status_update( entry );
-	  }
-	  else {
+          uint8_t result = set_discovered_link_status( &link_status );
+          if ( result == TD_RESPONSE_OK ) {
+            peer_link_status_update( entry );
+          }
+          else {
             reset_confirmed_state( entry );
           }
           break;
@@ -228,7 +229,7 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
               reset_wait_state( entry );
             }
             else {
-	      entry->dirty = false;
+              entry->dirty = false;
             }
           } else {
             set_confirmed_state( entry );
@@ -247,11 +248,11 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
             entry->to_datapath_id = 0;
             entry->to_port_no = 0;
             entry->link_up = false;
-            bool ret = set_link_status( &link_status, NULL, NULL );
-            if ( ret ) {
-	      peer_link_status_update( entry );
-	    }
-	    else {
+            uint8_t result = set_discovered_link_status( &link_status );
+            if ( result == TD_RESPONSE_OK ) {
+              peer_link_status_update( entry );
+            }
+            else {
               reset_confirmed_state( entry );
             }
           }
@@ -266,7 +267,8 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
           set_inactive_state( entry );
           break;
         case PROBE_TIMER_EVENT_TIMEOUT:
-          if ( --entry->retry_count > 0
+          --(entry->retry_count);
+          if ( entry->retry_count > 0
             && !entry->dirty ) {
             set_confirmed_state( entry );
           } else {
@@ -277,7 +279,7 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
           if ( !entry->link_up ) {
             // unstable link
             set_confirmed_state( entry );
-	    entry->dirty = true;
+            entry->dirty = true;
 
             topology_update_link_status link_status;
             link_status.from_dpid = entry->datapath_id;
@@ -285,7 +287,11 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
             link_status.to_dpid = *dpid;
             link_status.to_portno = port_no;
             link_status.status = TD_LINK_UNSTABLE;
-            set_link_status( &link_status, NULL, NULL );
+            uint8_t result = set_discovered_link_status( &link_status );
+            if ( result != TD_RESPONSE_OK ) {
+              // TODO: Is state transition of set link statsu error case OK?
+              warn( "Failed to set (0x%llx,%d)->(0x%llx,%d) status to TD_LINK_UNSTABLE.", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
+            }
           }
           break;
         default:
@@ -298,7 +304,7 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
   }
 
   if ( entry->state != old_state ) {
-    debug( "Update probe state: %d <= %d by event %d. dpid %" PRIx64 " %u.",
+    debug( "Update probe state: %d <= %d by event %d. dpid 0x%" PRIx64 " %u.",
            entry->state, old_state, event,
            entry->datapath_id, entry->port_no );
   }

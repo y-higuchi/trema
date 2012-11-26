@@ -47,6 +47,7 @@ typedef struct port_entry {
 typedef struct sw_entry {
   uint64_t datapath_id;
   uint32_t id;
+  bool up;
   list_element *port_table;
 } sw_entry;
 

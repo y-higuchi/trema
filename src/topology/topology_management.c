@@ -115,7 +115,7 @@ is_port_up( const struct ofp_phy_port *phy_port ) {
 
 
 static void
-add_notification( sw_entry *sw, const struct ofp_phy_port *phy_port ) {
+add_port_notification( sw_entry *sw, const struct ofp_phy_port *phy_port ) {
   port_entry *port = update_port_entry( sw, phy_port->port_no, phy_port->name );
   port->up = is_port_up( phy_port );
   port->id = sw->id;
@@ -127,7 +127,7 @@ add_notification( sw_entry *sw, const struct ofp_phy_port *phy_port ) {
 
 
 static void
-delete_notification( sw_entry *sw, port_entry *port ) {
+delete_port_notification( sw_entry *sw, port_entry *port ) {
   if ( port->link_to != NULL ) {
     port->link_to->up = false;
     // Link status notification
@@ -144,10 +144,7 @@ delete_notification( sw_entry *sw, port_entry *port ) {
 
 
 static void
-update_notification( sw_entry *sw, port_entry *port, const struct ofp_phy_port *phy_port ) {
-  UNUSED( sw );
-  UNUSED( port );
-
+update_port_notification( sw_entry *sw, port_entry *port, const struct ofp_phy_port *phy_port ) {
   if ( strncmp( port->name, phy_port->name, sizeof( port->name ) ) != 0 ) {
     strncpy( port->name, phy_port->name, sizeof( port->name ) );
     port->name[ OFP_MAX_PORT_NAME_LEN - 1] = '\0';
@@ -178,14 +175,21 @@ handle_switch_ready( uint64_t datapath_id, void *user_data ) {
   UNUSED( user_data );
 
   sw_entry *sw = update_sw_entry( &datapath_id );
+  sw->up = true;
   debug( "Switch(%#" PRIx64 ") is connected.", datapath_id );
+
+  // TODO Should switch ready be notified to subscribed users?
+  notify_switch_status_for_all_user( sw );
+
+  // TODO Only start initial discovery when discovery is enabled.
+  // TODO initial discovery should be handled by discovery_management.
   start_initial_discovery( sw );
   send_features_request( sw );
 }
 
 
 static void
-switch_disconnected( uint64_t datapath_id, void *user_data ) {
+handle_switch_disconnected( uint64_t datapath_id, void *user_data ) {
   UNUSED( user_data );
 
   sw_entry *sw = lookup_sw_entry( &datapath_id );
@@ -193,18 +197,21 @@ switch_disconnected( uint64_t datapath_id, void *user_data ) {
     warn( "Received switch-disconnected event, but switch(%#" PRIx64 ") is not found.", datapath_id );
     return;
   }
+  sw->up = false;
   const list_element *list, *next;
   for ( list = sw->port_table; list != NULL; list = next ) {
     next = list->next;
-    delete_notification( sw, list->data );
+    delete_port_notification( sw, list->data );
   }
+  notify_switch_status_for_all_user( sw );
+
   delete_sw_entry( sw );
   debug( "Switch(%#" PRIx64 ") is disconnected.", datapath_id );
 }
 
 
 static void
-switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
+handle_switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
                        uint32_t n_buffers, uint8_t n_tables,
                        uint32_t capabilities, uint32_t actions,
                        const list_element *phy_ports, void *user_data ) {
@@ -223,6 +230,9 @@ switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
   debug( "Received features-reply from switch(%#" PRIx64 ").", datapath_id );
   sw->id = transaction_id;
 
+  // TODO Fill sw_entry's feature related fields and notify sw update;
+  // notify_switch_status_for_all_user( sw );
+
   const list_element *list, *next;
   for ( list = phy_ports; list != NULL; list = list->next ) {
     const struct ofp_phy_port *phy_port = list->data;
@@ -233,7 +243,7 @@ switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
     }
     port_entry *port = update_port_entry( sw, phy_port->port_no, phy_port->name );
     port->id = transaction_id;
-    update_notification( sw, port, phy_port );
+    update_port_notification( sw, port, phy_port );
     debug( "Updated features-reply from switch(%#" PRIx64 "), port_no(%u).",
            datapath_id, phy_port->port_no );
   }
@@ -243,17 +253,19 @@ switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
     if ( port->id == transaction_id ) {
       continue;
     }
-    delete_notification( sw, port );
+    delete_port_notification( sw, port );
     debug( "Deleted port(%u) in switch(%#" PRIx64 ")", datapath_id, port->port_no );
   }
 }
 
 
 static void
-port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reason,
+handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reason,
              struct ofp_phy_port phy_port, void *user_data ) {
   UNUSED( transaction_id );
   UNUSED( user_data );
+
+  // TODO kick discovery on port events?
 
   sw_entry *sw = lookup_sw_entry( &datapath_id );
   if ( sw == NULL ) {
@@ -261,6 +273,10 @@ port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reason,
     return;
   }
   port_entry *port = lookup_port_entry( sw, phy_port.port_no, phy_port.name );
+
+  // TODO Fill port_entry feature related fields
+  // TODO should sw update event fired on port add/del/mod event?
+
   switch ( reason ) {
     case OFPPR_ADD:
       if ( port != NULL ) {
@@ -268,7 +284,7 @@ port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reason,
               phy_port.port_no, phy_port.name, datapath_id );
         return;
       }
-      add_notification( sw, &phy_port );
+      add_port_notification( sw, &phy_port );
       break;
 
     case OFPPR_DELETE:
@@ -277,7 +293,7 @@ port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reason,
               phy_port.port_no, phy_port.name, datapath_id );
         return;
       }
-      delete_notification( sw, port );
+      delete_port_notification( sw, port );
       break;
 
     case OFPPR_MODIFY:
@@ -287,10 +303,10 @@ port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reason,
         return;
       }
       if ( port->port_no != phy_port.port_no ) {
-        delete_notification( sw, port );
-        add_notification( sw, &phy_port );
+        delete_port_notification( sw, port );
+        add_port_notification( sw, &phy_port );
       } else {
-        update_notification( sw, port, &phy_port );
+        update_port_notification( sw, port, &phy_port );
       }
       break;
     default:
@@ -305,18 +321,29 @@ bool
 init_topology_management( topology_management_options new_options ) {
   options = new_options;
 
-  return true;
+  bool result = true;
+
+  init_topology_table();
+
+  if ( !openflow_application_interface_is_initialized() ) {
+      result = init_openflow_application_interface( get_trema_name() );
+  }
+
+  set_switch_ready_handler( handle_switch_ready, NULL );
+  set_switch_disconnected_handler( handle_switch_disconnected, NULL );
+  set_features_reply_handler( handle_switch_features_reply, NULL );
+  set_port_status_handler( handle_port_status, NULL );
+
+  return result;
+}
+
+void
+finalize_topology_management() {
 }
 
 
 bool
 start_topology_management( void ) {
-  init_openflow_application_interface( get_trema_name() );
-  set_switch_ready_handler( handle_switch_ready, NULL );
-  set_switch_disconnected_handler( switch_disconnected, NULL );
-  set_features_reply_handler( switch_features_reply, NULL );
-  set_port_status_handler( port_status, NULL );
-
   return true;
 }
 

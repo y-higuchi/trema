@@ -24,14 +24,26 @@
 
 #include "trema.h"
 #include "topology_table.h"
+#include "topology_service_interface.h"
 
+typedef void ( *switch_status_updated_hook )( void *user_data, const sw_entry *sw );
+typedef void ( *port_status_updated_hook )( void *user_data, const port_entry *port );
+typedef void ( *link_status_updated_hook )( void *user_data, const port_entry *port );
 
 bool start_service_management( void );
 void stop_service_management( void );
 
+void notify_switch_status_for_all_user( sw_entry *sw );
 void notify_port_status_for_all_user( port_entry *port );
 void notify_link_status_for_all_user( port_entry *port );
 
+// for topology local use
+
+bool set_link_status_updated_hook( link_status_updated_hook, void *user_data );
+bool set_port_status_updated_hook( port_status_updated_hook, void *user_data );
+bool set_switch_status_updated_hook( switch_status_updated_hook, void *user_data );
+
+uint8_t set_discovered_link_status( topology_update_link_status* link_status );
 
 #endif // SERVICE_MANAGEMENT_H
 

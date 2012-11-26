@@ -25,9 +25,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "etherip.h"
+//#include "etherip.h"
 #include "trema.h"
-#include "probe_timer_table.h"
+//#include "probe_timer_table.h"
 #include "lldp.h"
 
 
@@ -379,13 +379,18 @@ parse_lldp_us( void *str, uint16_t *value, uint32_t len ) {
 
 static void
 handle_packet_in( uint64_t dst_datapath_id,
-                  uint32_t transaction_id __attribute__((unused)),
-                  uint32_t buffer_id __attribute__((unused)),
-                  uint16_t total_len __attribute__((unused)),
+                  uint32_t transaction_id,
+                  uint32_t buffer_id,
+                  uint16_t total_len,
                   uint16_t dst_port_no,
-                  uint8_t reason __attribute__((unused)),
+                  uint8_t reason,
                   const buffer *m,
-                  void *user_data __attribute__((unused)) ) {
+                  void *user_data ) {
+  UNUSED( transaction_id );
+  UNUSED( buffer_id );
+  UNUSED( total_len );
+  UNUSED( reason );
+  UNUSED( user_data );
   packet_info *packet_info = m->user_data;
   assert( packet_info != NULL );
 
@@ -422,7 +427,9 @@ init_lldp( lldp_options options ) {
   lldp_ip_src = options.lldp_ip_src;
   lldp_ip_dst = options.lldp_ip_dst;
 
-  init_openflow_application_interface( get_trema_name() );
+  if ( !openflow_application_interface_is_initialized() ) {
+      init_openflow_application_interface( get_trema_name() );
+  }
   set_packet_in_handler( handle_packet_in, NULL );
 
   return true;
