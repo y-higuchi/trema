@@ -32,7 +32,6 @@
 #include "discovery_management.h"
 
 #include "lldp.h"
-#include "topology_service_interface_option_parser.h"
 
 static char short_options[] = "io:r:";
 static struct option long_options[] = {
@@ -199,7 +198,7 @@ main( int argc, char *argv[] ) {
   parse_options( &options, &argc, &argv );
 
   // sets topology service interface name
-  init_topology_service_interface_options( &argc, &argv );
+  //init_topology_service_interface_options( &argc, &argv );
 
   init_topology_management( options.management );
 
@@ -222,7 +221,7 @@ main( int argc, char *argv[] ) {
   finalize_topology_table();
 
 
-  finalize_topology_service_interface_options();
+  //finalize_topology_service_interface_options();
 
   return 0;
 }
