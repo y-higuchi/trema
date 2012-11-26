@@ -33,9 +33,12 @@ typedef struct {
 
 
 bool init_topology_management( topology_management_options new_options );
+void finalize_topology_management();
+
 bool start_topology_management( void );
 void stop_topology_management( void );
 
+// TODO add local_port_update_handler?
 
 #endif // TOPOLOGY_MANAGEMENT_H
 

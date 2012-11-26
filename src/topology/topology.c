@@ -26,10 +26,13 @@
 #include <stdio.h>
 #include <openflow.h>
 #include "trema.h"
-#include "topology_table.h"
 #include "service_management.h"
 #include "topology_management.h"
+// from discovery
+#include "discovery_management.h"
 
+#include "lldp.h"
+#include "topology_service_interface_option_parser.h"
 
 static char short_options[] = "io:r:";
 static struct option long_options[] = {
@@ -39,9 +42,12 @@ static struct option long_options[] = {
   { NULL, 0, NULL, 0  },
 };
 
+static uint8_t g_lldp_default_dst[ ETH_ADDRLEN ] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
 
 typedef struct {
+  lldp_options lldp;
   topology_management_options management;
+  discovery_management_options discovery;
 } topology_options;
 
 
@@ -104,6 +110,19 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
     new_argv[ i ] = ( *argv )[ i ];
   }
 
+  // TODO parse LLDP options
+  memcpy( options->lldp.lldp_mac_dst, g_lldp_default_dst, ETH_ADDRLEN );
+  options->lldp.lldp_over_ip = false;
+  options->lldp.lldp_ip_src = 0;
+  options->lldp.lldp_ip_dst = 0;
+
+  // TODO parse discovery options
+  options->discovery.lldp_over_ip = false;
+  options->discovery.lldp_ip_src = 0;
+  options->discovery.lldp_ip_dst = 0;
+
+
+  //
   options->management.lldp_over_ip = false;
   options->management.lldp_ip_src = 0;
   options->management.lldp_ip_dst = 0;
@@ -174,9 +193,18 @@ main( int argc, char *argv[] ) {
   topology_options options;
 
   init_trema( &argc, &argv );
+  // TODO remove later
+  set_logging_level("debug");
+
   parse_options( &options, &argc, &argv );
-  init_topology_table();
+
+  // sets topology service interface name
+  init_topology_service_interface_options( &argc, &argv );
+
   init_topology_management( options.management );
+
+  init_lldp( options.lldp );
+  init_discovery_management( options.discovery );
 
   start_topology_management();
   start_service_management();
@@ -185,7 +213,16 @@ main( int argc, char *argv[] ) {
 
   stop_service_management();
   stop_topology_management();
+
+  finalize_discovery_management();
+  finalize_lldp();
+  finalize_probe_timer_table();
+
+  finalize_topology_management();
   finalize_topology_table();
+
+
+  finalize_topology_service_interface_options();
 
   return 0;
 }

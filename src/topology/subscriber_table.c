@@ -22,6 +22,7 @@
 #include "subscriber_table.h"
 
 
+
 static list_element *subscriber_table;
 
 
@@ -31,6 +32,8 @@ allocate_subscriber_entry( const char *name ) {
 
   new_entry = xmalloc( sizeof( subscriber_entry ) );
   new_entry->name = xstrdup( name );
+  new_entry->use_discovery = false;
+  new_entry->last_seen = time( NULL );
 
   return new_entry;
 }
