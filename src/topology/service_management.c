@@ -26,9 +26,7 @@
 #include "subscriber_table.h"
 #include "discovery_management.h"
 
-// TODO make ping interval configurable.
-static time_t PING_INTERVAL_SEC = 60;
-static int PING_AGEOUT_COUNT = 5;
+static service_management_options options;
 
 static link_status_updated_hook g_link_status_updated_hook = NULL;
 static void *g_link_status_updated_hook_param = NULL;
@@ -615,7 +613,7 @@ ping_subscriber( subscriber_entry *entry, void *user_data ) {
 
   // ping age out
   const time_t current = time(NULL);
-  if( (current - entry->last_seen) > (PING_INTERVAL_SEC * PING_AGEOUT_COUNT) ) {
+  if( (current - entry->last_seen) > (options.ping_interval_sec * options.ping_ageout_cycles) ) {
     // remove aged out entry
     notice( "Aged out subscriber '%s'", entry->name );
     delete_subscriber_entry( entry );
@@ -630,7 +628,6 @@ ping_all_subscriber( void* user_data) {
 
 bool
 start_service_management( void ) {
-  init_subscriber_table();
   bool init_success = false;
   init_success = add_message_requested_callback( get_trema_name(), recv_request );
   if ( !init_success ) {
@@ -646,7 +643,7 @@ start_service_management( void ) {
 
 
   // TODO make ping interval configurable.
-  init_success = add_periodic_event_callback( PING_INTERVAL_SEC, ping_all_subscriber, NULL );
+  init_success = add_periodic_event_callback( options.ping_interval_sec, ping_all_subscriber, NULL );
   if ( !init_success ) {
       error( "Failed to register ping check timer event." );
       return false;
@@ -656,6 +653,19 @@ start_service_management( void ) {
 
 
 void stop_service_management( void ) {
+}
+
+
+bool
+init_service_management( service_management_options new_options ) {
+  options = new_options;
+  init_subscriber_table();
+  return true;
+}
+
+
+void
+finalize_service_management( void ) {
   finalize_subscriber_table();
 }
 

@@ -19,23 +19,40 @@ static bool g_discovery_enabled = false;
 static const uint16_t INITIAL_DISCOVERY_PERIOD = 5;
 static discovery_management_options options;
 
-void
+bool
 init_discovery_management( discovery_management_options new_options ) {
   options = new_options;
+  bool result = true;
 
   init_probe_timer_table();
-  // TODO lldp should be initialized here
+  result = init_lldp( new_options.lldp );
+
 
   // init open flow service interface to use flow_mod
   if ( !openflow_application_interface_is_initialized() ) {
       init_openflow_application_interface( get_trema_name() );
   }
+  return result;
 }
 
 
 void
-finalize_discovery_management() {
+finalize_discovery_management( void ) {
+  finalize_lldp();
+  finalize_probe_timer_table();
+}
+
+
+bool
+start_discovery_management( void ){
+  return true;
+}
+
+
+void
+stop_discovery_management( void ){
   if( g_discovery_enabled ) {
+    warn( "Discovery was left enabled." );
     disable_discovery();
   }
 }
@@ -45,7 +62,7 @@ static void
 send_flow_mod_receiving_lldp( const sw_entry *sw, uint16_t hard_timeout, uint16_t priority, bool add ) {
   struct ofp_match match;
   memset( &match, 0, sizeof( struct ofp_match ) );
-  if ( !options.lldp_over_ip ) {
+  if ( !options.lldp.lldp_over_ip ) {
     match.wildcards = OFPFW_ALL & ~OFPFW_DL_TYPE;
     match.dl_type = ETH_ETHTYPE_LLDP;
   }
@@ -53,8 +70,8 @@ send_flow_mod_receiving_lldp( const sw_entry *sw, uint16_t hard_timeout, uint16_
     match.wildcards = OFPFW_ALL & ~( OFPFW_DL_TYPE | OFPFW_NW_PROTO | OFPFW_NW_SRC_MASK | OFPFW_NW_DST_MASK );
     match.dl_type = ETH_ETHTYPE_IPV4;
     match.nw_proto = IPPROTO_ETHERIP;
-    match.nw_src = options.lldp_ip_src;
-    match.nw_dst = options.lldp_ip_dst;
+    match.nw_src = options.lldp.lldp_ip_src;
+    match.nw_dst = options.lldp.lldp_ip_dst;
   }
 
   openflow_actions *actions = create_actions();
@@ -143,7 +160,7 @@ switch_del_LLDP_flow_mods( sw_entry *sw, void *user_data ) {
 
 
 void
-enable_discovery() {
+enable_discovery( void ) {
   if ( g_discovery_enabled ) {
     warn( "Topology Discovery is already enabled." );
   }
@@ -159,7 +176,7 @@ enable_discovery() {
 }
 
 void
-disable_discovery() {
+disable_discovery( void ) {
   if ( !g_discovery_enabled ) {
     warn( "Topology Discovery was not enabled." );
   }
