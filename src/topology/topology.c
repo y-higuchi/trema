@@ -21,20 +21,21 @@
 #include <assert.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ether.h>
 #include <arpa/inet.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <openflow.h>
 #include "trema.h"
+
 #include "service_management.h"
 #include "topology_management.h"
-// from discovery
 #include "discovery_management.h"
 
-#include "lldp.h"
+static char short_options[] = "m:io:r:";
 
-static char short_options[] = "io:r:";
 static struct option long_options[] = {
+  { "lldp_mac_dst", required_argument, NULL, 'm' },
   { "lldp_over_ip", no_argument, NULL, 'i' },
   { "lldp_ip_src", required_argument, NULL, 'o' },
   { "lldp_ip_dst", required_argument, NULL, 'r' },
@@ -44,8 +45,7 @@ static struct option long_options[] = {
 static uint8_t g_lldp_default_dst[ ETH_ADDRLEN ] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
 
 typedef struct {
-  lldp_options lldp;
-  topology_management_options management;
+  service_management_options service;
   discovery_management_options discovery;
 } topology_options;
 
@@ -56,6 +56,7 @@ usage() {
     "topology manager\n"
     "Usage: %s [OPTION]...\n"
     "\n"
+    "  -m, --lldp_mac_dst=MAC_ADDR     destination Mac address for sending LLDP\n"
     "  -i, --lldp_over_ip              send LLDP messages over IP\n"
     "  -o, --lldp_ip_src=IP_ADDR       source IP address for sending LLDP over IP\n"
     "  -r, --lldp_ip_dst=IP_ADDR       destination IP address for sending LLDP over IP\n"
@@ -76,6 +77,21 @@ reset_getopt() {
   opterr = 1;
 }
 
+static bool
+set_mac_address_from_string( uint8_t *address, const char *string ) {
+  assert( address != NULL );
+  assert( string != NULL );
+
+  struct ether_addr *addr = ether_aton( string );
+  if ( addr == NULL ) {
+    error( "Invalid MAC address specified." );
+    return false;
+  }
+
+  memcpy( address, addr->ether_addr_octet, ETH_ADDRLEN );
+
+  return true;
+}
 
 static bool
 set_ip_address_from_string( uint32_t *address, const char *string ) {
@@ -109,46 +125,48 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
     new_argv[ i ] = ( *argv )[ i ];
   }
 
-  // TODO parse LLDP options
-  memcpy( options->lldp.lldp_mac_dst, g_lldp_default_dst, ETH_ADDRLEN );
-  options->lldp.lldp_over_ip = false;
-  options->lldp.lldp_ip_src = 0;
-  options->lldp.lldp_ip_dst = 0;
 
-  // TODO parse discovery options
-  options->discovery.lldp_over_ip = false;
-  options->discovery.lldp_ip_src = 0;
-  options->discovery.lldp_ip_dst = 0;
+  // TODO make ping interval configureable
+  options->service.ping_interval_sec = 60;
+  options->service.ping_ageout_cycles = 5;
 
-
-  //
-  options->management.lldp_over_ip = false;
-  options->management.lldp_ip_src = 0;
-  options->management.lldp_ip_dst = 0;
+  memcpy( options->discovery.lldp.lldp_mac_dst, g_lldp_default_dst, ETH_ADDRLEN );
+  options->discovery.lldp.lldp_over_ip = false;
+  options->discovery.lldp.lldp_ip_src = 0;
+  options->discovery.lldp.lldp_ip_dst = 0;
 
   int c;
   while ( ( c = getopt_long( *argc, *argv, short_options, long_options, NULL ) ) != -1 ) {
     switch ( c ) {
+      case 'm':
+        if ( set_mac_address_from_string( options->discovery.lldp.lldp_mac_dst, optarg ) == false ) {
+          usage();
+          exit( EXIT_FAILURE );
+          return;
+        }
+        info( "%s is used as destination address for sending LLDP.", ether_ntoa( ( const struct ether_addr * ) options->discovery.lldp.lldp_mac_dst ) );
+        break;
+
       case 'i':
         debug( "Enabling LLDP over IP" );
-        options->management.lldp_over_ip = true;
+        options->discovery.lldp.lldp_over_ip = true;
         break;
 
       case 'o':
-        if ( set_ip_address_from_string( &options->management.lldp_ip_src, optarg ) == false ) {
+        if ( set_ip_address_from_string( &options->discovery.lldp.lldp_ip_src, optarg ) == false ) {
           usage();
           exit( EXIT_FAILURE );
           return;
         }
-        info( "%s ( %#x ) is used as source address for sending LLDP over IP.", optarg, options->management.lldp_ip_src );
+        info( "%s ( %#x ) is used as source address for sending LLDP over IP.", optarg, options->discovery.lldp.lldp_ip_src );
         break;
       case 'r':
-        if ( set_ip_address_from_string( &options->management.lldp_ip_dst, optarg ) == false ) {
+        if ( set_ip_address_from_string( &options->discovery.lldp.lldp_ip_dst, optarg ) == false ) {
           usage();
           exit( EXIT_FAILURE );
           return;
         }
-        info( "%s ( %#x ) is used as destination address for sending LLDP over IP.", optarg, options->management.lldp_ip_dst );
+        info( "%s ( %#x ) is used as destination address for sending LLDP over IP.", optarg, options->discovery.lldp.lldp_ip_dst );
         break;
 
       default:
@@ -166,7 +184,7 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
     }
   }
 
-  if ( options->management.lldp_over_ip == true && ( options->management.lldp_ip_src == 0 || options->management.lldp_ip_dst == 0 ) ) {
+  if ( options->discovery.lldp.lldp_over_ip == true && ( options->discovery.lldp.lldp_ip_src == 0 || options->discovery.lldp.lldp_ip_dst == 0 ) ) {
     printf( "-o and -r options are mandatory." );
     usage();
     exit( EXIT_FAILURE );
@@ -192,36 +210,31 @@ main( int argc, char *argv[] ) {
   topology_options options;
 
   init_trema( &argc, &argv );
-  // TODO remove later
-  set_logging_level("debug");
 
   parse_options( &options, &argc, &argv );
 
-  // sets topology service interface name
-  //init_topology_service_interface_options( &argc, &argv );
 
-  init_topology_management( options.management );
+  init_topology_table();
 
-  init_lldp( options.lldp );
+  init_topology_management();
   init_discovery_management( options.discovery );
+  init_service_management( options.service );
 
   start_topology_management();
   start_service_management();
+  start_discovery_management();
 
   start_trema();
 
+  stop_discovery_management();
   stop_service_management();
   stop_topology_management();
 
+  finalize_service_management();
   finalize_discovery_management();
-  finalize_lldp();
-  finalize_probe_timer_table();
-
   finalize_topology_management();
+
   finalize_topology_table();
-
-
-  //finalize_topology_service_interface_options();
 
   return 0;
 }

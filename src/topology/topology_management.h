@@ -24,16 +24,8 @@
 
 #include "trema.h"
 
-
-typedef struct {
-  bool lldp_over_ip;
-  uint32_t lldp_ip_src;
-  uint32_t lldp_ip_dst;
-} topology_management_options;
-
-
-bool init_topology_management( topology_management_options new_options );
-void finalize_topology_management();
+bool init_topology_management( void );
+void finalize_topology_management( void );
 
 bool start_topology_management( void );
 void stop_topology_management( void );

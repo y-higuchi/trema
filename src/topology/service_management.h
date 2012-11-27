@@ -26,9 +26,18 @@
 #include "topology_table.h"
 #include "topology_service_interface.h"
 
+typedef struct service_management_options {
+  time_t ping_interval_sec;
+  int ping_ageout_cycles;
+} service_management_options;
+
+
 typedef void ( *switch_status_updated_hook )( void *user_data, const sw_entry *sw );
 typedef void ( *port_status_updated_hook )( void *user_data, const port_entry *port );
 typedef void ( *link_status_updated_hook )( void *user_data, const port_entry *port );
+
+bool init_service_management( service_management_options new_options );
+void finalize_service_management();
 
 bool start_service_management( void );
 void stop_service_management( void );

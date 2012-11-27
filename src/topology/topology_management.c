@@ -28,7 +28,6 @@
 
 
 static const uint16_t INITIAL_DISCOVERY_PERIOD = 5;
-static topology_management_options options;
 
 
 
@@ -249,15 +248,12 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
 
 
 bool
-init_topology_management( topology_management_options new_options ) {
-  options = new_options;
+init_topology_management( void ) {
 
   bool result = true;
 
-  init_topology_table();
-
   if ( !openflow_application_interface_is_initialized() ) {
-      result = init_openflow_application_interface( get_trema_name() );
+    result = init_openflow_application_interface( get_trema_name() );
   }
 
   set_switch_ready_handler( handle_switch_ready, NULL );
@@ -269,7 +265,7 @@ init_topology_management( topology_management_options new_options ) {
 }
 
 void
-finalize_topology_management() {
+finalize_topology_management( void ) {
 }
 
 
