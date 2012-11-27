@@ -76,29 +76,9 @@ send_flow_mod_receiving_lldp( const sw_entry *sw, uint16_t hard_timeout, uint16_
 
 
 static void
-send_flow_mod_discarding_all_packets( const sw_entry *sw, uint16_t hard_timeout, uint16_t priority ) {
-  struct ofp_match match;
-  memset( &match, 0, sizeof( struct ofp_match ) );
-  match.wildcards = OFPFW_ALL;
-
-  const uint16_t idle_timeout = 0;
-  const uint32_t buffer_id = UINT32_MAX;
-  const uint16_t flags = 0;
-  buffer *flow_mod = create_flow_mod( get_transaction_id(), match, get_cookie(),
-                                      OFPFC_ADD, idle_timeout, hard_timeout,
-                                      priority, buffer_id,
-                                      OFPP_NONE, flags, NULL );
-  send_openflow_message( sw->datapath_id, flow_mod );
-  free_buffer( flow_mod );
-  debug( "Sent a flow_mod for discarding all packets received on %#" PRIx64 ".", sw->datapath_id );
-}
-
-static void
 send_add_LLDP_flow_mods( const sw_entry *sw ) {
   const bool add = true;
   send_flow_mod_receiving_lldp( sw, 0, UINT16_MAX, add );
-  // TODO Is initial block period required?
-   send_flow_mod_discarding_all_packets( sw, INITIAL_DISCOVERY_PERIOD, UINT16_MAX - 1 );
 }
 
 
