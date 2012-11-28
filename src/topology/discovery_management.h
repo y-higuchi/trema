@@ -27,8 +27,6 @@ void stop_discovery_management( void );
 void enable_discovery( void );
 void disable_discovery( void );
 
-// TODO local api to set discovery config.
-
-// TODO Future work port masking etc.
+// TODO Future work: port masking API etc.
 
 #endif /* DISCOVERY_MANAGEMENT_H_ */

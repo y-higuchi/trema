@@ -126,7 +126,7 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
   }
 
 
-  // TODO make ping interval configureable
+  // TODO make ping interval configurable from argument
   options->service.ping_interval_sec = 60;
   options->service.ping_ageout_cycles = 5;
 
