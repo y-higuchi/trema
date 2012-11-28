@@ -27,11 +27,6 @@ init_discovery_management( discovery_management_options new_options ) {
   init_probe_timer_table();
   result = init_lldp( new_options.lldp );
 
-
-  // init open flow service interface to use flow_mod
-  if ( !openflow_application_interface_is_initialized() ) {
-      init_openflow_application_interface( get_trema_name() );
-  }
   return result;
 }
 
@@ -52,7 +47,7 @@ start_discovery_management( void ){
 void
 stop_discovery_management( void ){
   if( g_discovery_enabled ) {
-    warn( "Discovery was left enabled." );
+    notice( "Discovery was left enabled." );
     disable_discovery();
   }
 }

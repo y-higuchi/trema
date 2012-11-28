@@ -249,12 +249,7 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
 
 bool
 init_topology_management( void ) {
-
   bool result = true;
-
-  if ( !openflow_application_interface_is_initialized() ) {
-    result = init_openflow_application_interface( get_trema_name() );
-  }
 
   set_switch_ready_handler( handle_switch_ready, NULL );
   set_switch_disconnected_handler( handle_switch_disconnected, NULL );

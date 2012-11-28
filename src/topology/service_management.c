@@ -476,8 +476,8 @@ recv_request( const messenger_context_handle *handle,
 
 static void
 recv_ping_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
-  UNUSED(tag);
-  UNUSED(user_data);
+  UNUSED( tag );
+  UNUSED( user_data );
 
   if( len == 0 ){
     error( "%s: Ping reply length was too short. (len=%z)", __func__, len );
@@ -499,8 +499,6 @@ recv_ping_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
 
 static void
 recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
-  //unmark_transaction( user_data );
-
   switch ( tag ) {
   case TD_MSGTYPE_PING_RESPONSE:
     recv_ping_reply( tag, data, len, user_data );
@@ -597,6 +595,7 @@ create_topology_request_message( const char *name ) {
   return buf;
 }
 
+
 static void
 ping_subscriber( subscriber_entry *entry, void *user_data ) {
   UNUSED( user_data );
@@ -608,11 +607,11 @@ ping_subscriber( subscriber_entry *entry, void *user_data ) {
                 TD_MSGTYPE_PING_REQUEST,
                 ping->data, ping->length, NULL );
   if ( !success ) {
-    warn( "Failed to send ping to %s", entry->name );
+    warn( "Failed to send ping to '%s'", entry->name );
   }
 
   // ping age out
-  const time_t current = time(NULL);
+  const time_t current = time( NULL );
   if( (current - entry->last_seen) > (options.ping_interval_sec * options.ping_ageout_cycles) ) {
     // remove aged out entry
     notice( "Aged out subscriber '%s'", entry->name );
