@@ -521,8 +521,8 @@ check_transaction_table( void *user_data ) {
   hash_entry *e;
   while (( e = iterate_hash_next( &iter ) ) != NULL ) {
     struct send_request_param *param = e->value;
-    warn( "Outstanding transaction still remains: %#x", param->transaction_id );
-    warn( " message type is %u", param->message_type );
+    warn( "Outstanding transaction still remains: 0x%#x", param->transaction_id );
+    warn( " message type is 0x%x", param->message_type );
     char buf[ 32 ];
     warn( " called at %s", ctime_r( ( time_t * ) &param->called_at.tv_sec, buf ) );
   }
