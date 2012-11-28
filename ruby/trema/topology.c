@@ -50,6 +50,12 @@ switch_status_to_hash( const topology_switch_status* sw_status ) {
   VALUE sw = rb_hash_new();
   rb_hash_aset( sw, ID2SYM( rb_intern( "dpid" ) ), ULL2NUM( sw_status->dpid ) );
   rb_hash_aset( sw, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)sw_status->status ) );
+  // TODO document the definition of Switch "up" state
+  if( sw_status->status == TD_SWITCH_UP ) {
+    rb_hash_aset( sw, ID2SYM( rb_intern( "up" ) ), Qtrue );
+  } else {
+    rb_hash_aset( sw, ID2SYM( rb_intern( "up" ) ), Qfalse );
+  }
   return sw;
 }
 
@@ -101,6 +107,17 @@ link_status_to_hash( const topology_link_status* link_status ) {
   rb_hash_aset( link, ID2SYM( rb_intern( "to_dpid" ) ), ULL2NUM( link_status->to_dpid ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "to_port_no" ) ), INT2FIX( (int)link_status->to_portno ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)link_status->status ) );
+  // TODO document the definition of Link "up" state
+  if( link_status->status != TD_LINK_DOWN ) {
+    rb_hash_aset( link, ID2SYM( rb_intern( "up" ) ), Qtrue );
+  } else {
+    rb_hash_aset( link, ID2SYM( rb_intern( "up" ) ), Qfalse );
+  }
+  if( link_status->status == TD_LINK_UNSTABLE ) {
+    rb_hash_aset( link, ID2SYM( rb_intern( "unstable" ) ), Qtrue );
+  } else {
+    rb_hash_aset( link, ID2SYM( rb_intern( "unstable" ) ), Qfalse );
+  }
   return link;
 }
 
@@ -237,6 +254,14 @@ handle_get_all_link_status_callback( void *self, size_t number, const topology_l
     }
     rb_funcall( ( VALUE ) self, rb_intern( "all_link_status_reply" ), 1, links );
   }
+  if ( rb_respond_to( ( VALUE ) self, rb_intern( "_all_link_status_reply" ) ) == Qtrue ) {
+    VALUE links = rb_ary_new2( (long)number );
+    for( size_t i = 0 ; i < number ; ++i ){
+      VALUE link = link_status_to_hash( &link_status[i] );
+      rb_ary_push( links, link );
+    }
+    rb_funcall( ( VALUE ) self, rb_intern( "_all_link_status_reply" ), 1, links );
+  }
 }
 
 /**
@@ -257,6 +282,14 @@ handle_get_all_port_status_callback( void *self, size_t number, const topology_p
       rb_ary_push( ports, port );
     }
     rb_funcall( ( VALUE ) self, rb_intern( "all_port_status_reply" ), 1, ports );
+  }
+  if ( rb_respond_to( ( VALUE ) self, rb_intern( "_all_port_status_reply" ) ) == Qtrue ) {
+    VALUE ports = rb_ary_new2( (long)number );
+    for( size_t i = 0 ; i < number ; ++i ){
+      VALUE port = port_status_to_hash( &port_status[i] );
+      rb_ary_push( ports, port );
+    }
+    rb_funcall( ( VALUE ) self, rb_intern( "_all_port_status_reply" ), 1, ports );
   }
 }
 
@@ -279,6 +312,14 @@ handle_get_all_switch_status_callback( void *self, size_t number, const topology
     }
     rb_funcall( ( VALUE ) self, rb_intern( "all_switch_status_reply" ), 1, switches );
   }
+  if ( rb_respond_to( ( VALUE ) self, rb_intern( "_all_switch_status_reply" ) ) == Qtrue ) {
+     VALUE switches = rb_ary_new2( (long)number );
+     for( size_t i = 0 ; i < number ; ++i ){
+       VALUE sw = switch_status_to_hash( &sw_status[i] );
+       rb_ary_push( switches, sw );
+     }
+     rb_funcall( ( VALUE ) self, rb_intern( "_all_switch_status_reply" ), 1, switches );
+   }
 }
 
 
