@@ -106,7 +106,7 @@ module Trema
     # Initialization before start_trema() call.
     # Initialize and subscribe to topology interface.
     # This method will be implicitly called inside Controller#run! between init_trema() and start_trema() calls.
-    # Be sure to call super if overriding this method.
+    # @note Be sure to initialize and subscribe to topology, or call super() if overriding this method.
     #
     # @example
     #  class MyController < Controller
@@ -117,7 +117,7 @@ module Trema
     #  end
     #
     def start
-      # TODO correctly set init_libtopology argument
+      #  specify the name of topology service name
       init_libtopology "topology" 
       subscribe_topology 
     end

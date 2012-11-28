@@ -641,7 +641,6 @@ start_service_management( void ) {
   }
 
 
-  // TODO make ping interval configurable.
   init_success = add_periodic_event_callback( options.ping_interval_sec, ping_all_subscriber, NULL );
   if ( !init_success ) {
       error( "Failed to register ping check timer event." );

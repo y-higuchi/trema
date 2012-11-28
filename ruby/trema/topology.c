@@ -119,7 +119,6 @@ handle_link_status_updated( void* self, const topology_link_status* link_status 
 
 static void
 handle_subscribed_reply( void* self, topology_response *res ) {
-  // TODO register all handlers
   switch ( res->status ) {
   case TD_RESPONSE_OK:
   case TD_RESPONSE_ALREADY_SUBSCRIBED:

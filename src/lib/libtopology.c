@@ -267,7 +267,7 @@ recv_link_status_notification( uint16_t tag, void *data, size_t len ) {
     s->to_dpid = ntohll( s->to_dpid );
     s->to_portno = ntohs( s->to_portno );
 
-    // TODO update link cache
+    // TODO update link cache when implementing Topology cache in C
 
     ( *link_status_updated_callback )( link_status_updated_callback_param, s );
   }
@@ -291,7 +291,7 @@ recv_port_status_notification( uint16_t tag, void *data, size_t len ) {
   s->dpid = ntohll( s->dpid );
   s->port_no = ntohs( s->port_no );
 
-  // TODO update port cache
+  // TODO update port cache when implementing Topology cache in C
 
   // (re)build port db
   ( *port_status_updated_callback )( port_status_updated_callback_param, s );
@@ -311,7 +311,7 @@ recv_switch_status_notification( uint16_t tag, void *data, size_t len ) {
   // arrange byte order
   switch_status->dpid = ntohll( switch_status->dpid );
 
-  // TODO update switch cache
+  // TODO update switch cache when implementing Topology cache in C
 
   (* switch_status_updated_callback )( switch_status_updated_callback_param, switch_status );
 }
@@ -465,7 +465,7 @@ recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
 
   default:
     error( "%s: Unknown message type: 0x%x", __func__, (unsigned int)tag );
-    // TODO Shoudld we call default handler for unknown tag?
+    // TODO Should we call default handler for unknown tag?
     //  Not calling default handler may leak user_data,
     //  but calling default handler may seg fault if the message was completely corrupted.
     recv_topology_response( tag, data, len, user_data );
@@ -514,7 +514,7 @@ static void
 check_transaction_table( void *user_data ) {
   hash_table *transaction_table = user_data;
 
-  // TODO implement daemon heatbeat check
+  // TODO implement client -> server heart beat check here?
 
   hash_iterator iter;
   init_hash_iterator( transaction_table, &iter );
@@ -559,8 +559,6 @@ add_callback_switch_status_updated( void ( *callback )( void *user_data,
                                                            const topology_switch_status *link_status ),
                                                            void *user_data ) {
 
-  // TODO: split callback_switch_status for cache mgmt
-
   switch_status_updated_callback = callback;
   switch_status_updated_callback_param = user_data;
 
@@ -572,8 +570,6 @@ bool
 add_callback_port_status_updated(
   void ( *callback )( void *, const topology_port_status * ), void *param ) {
 
-  // TODO: split callback_port_status for cache mgmt
-
   port_status_updated_callback = callback;
   port_status_updated_callback_param = param;
 
@@ -584,8 +580,6 @@ add_callback_port_status_updated(
 bool
 add_callback_link_status_updated(
   void ( *callback )( void *, const topology_link_status * ), void *param ) {
-
-  // TODO: split callback_link_status for cache mgmt
 
   link_status_updated_callback = callback;
   link_status_updated_callback_param = param;
