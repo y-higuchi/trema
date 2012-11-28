@@ -213,23 +213,33 @@ main( int argc, char *argv[] ) {
 
   parse_options( &options, &argc, &argv );
 
+  char ofa_service_name[MESSENGER_SERVICE_NAME_LENGTH] = {};
+  if ( strlen( get_trema_name() ) >= ( MESSENGER_SERVICE_NAME_LENGTH - 4 ) ) {
+    die( "Base service name too long to create open flow appllication service name ( %s ).", get_trema_name() );
+  }
+  snprintf( ofa_service_name, MESSENGER_SERVICE_NAME_LENGTH, "%s.ofa", get_trema_name() );
+  init_openflow_application_interface( ofa_service_name );
 
+  info( "Initializing topology services");
   init_topology_table();
 
   init_topology_management();
   init_discovery_management( options.discovery );
   init_service_management( options.service );
 
+  info( "Starting topology services");
   start_topology_management();
   start_service_management();
   start_discovery_management();
 
   start_trema();
 
+  info( "Stopping topology services");
   stop_discovery_management();
   stop_service_management();
   stop_topology_management();
 
+  info( "Finalizing topology services");
   finalize_service_management();
   finalize_discovery_management();
   finalize_topology_management();

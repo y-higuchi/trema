@@ -427,9 +427,6 @@ init_lldp( lldp_options options ) {
   lldp_ip_src = options.lldp_ip_src;
   lldp_ip_dst = options.lldp_ip_dst;
 
-  if ( !openflow_application_interface_is_initialized() ) {
-      init_openflow_application_interface( get_trema_name() );
-  }
   set_packet_in_handler( handle_packet_in, NULL );
 
   return true;
