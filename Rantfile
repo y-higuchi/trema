@@ -42,6 +42,7 @@ task :default => [
   :switch_manager,
   :switch,
   :topology,
+  :show_topology,
   :packetin_filter,
   :tremashark,
   :packet_capture,
@@ -480,6 +481,20 @@ file Trema::Executables.topology => topology_objects + [ libtrema ] do | t |
   sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
 end
 
+show_topology_objects = [
+  "show_topology.o",
+  "show_topology_csv.o",
+  "show_topology_dsl.o",
+  "show_topology_graph_easy.o",
+].collect do | each |
+  File.join topology_objects_dir, each
+end
+
+desc "Build show_topology."
+task :show_topology => Trema::Executables.show_topology
+file Trema::Executables.show_topology => show_topology_objects + [ libtrema ] do | t |
+  sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
+end
 
 ################################################################################
 # Build switch manager
