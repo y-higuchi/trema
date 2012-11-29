@@ -326,6 +326,53 @@ module Trema
   end
   
   # module to add cached topology information capability to Controller
+  #
+  # @example
+  #  class HelloSwitch < Controller
+  #    include TopologyCache
+  #  
+  #    def topology_ready
+  #      info "Topology ready!"
+  #      # enable link discovery after topology is ready
+  #      enable_topology_discovery
+  #    end
+  #  
+  #    def topology_discovery_ready
+  #      info "Discovery ready!"
+  #      # enable cache after link discovery is ready
+  #      rebuild_cache
+  #    end
+  #    
+  #    def cache_ready cache
+  #      info "Topology Cache ready!"
+  #      p cache
+  #
+  #      # You can do whatever with cache after this point.
+  #      # Topology::Cache instance can be obtained later using #get_cache method.
+  #    end
+  #    
+  #    def link_status_updated link
+  #      info "link_status_updated!"
+  #      p link
+  #      
+  #      # Do what ever before Topology Cache update
+  #      # Note: Link instance will be removed after cache update, if the state
+  #      #       was not up.
+  #      
+  #      # (Optional) Manually update Cache
+  #      # Note: Cache will be automatically updated after exit from this handler
+  #      #       even if this manual update 
+  #      update_cache_by_switch_hash sw
+  #      
+  #      if cache_ready?
+  #        # Check to see if we're at a point after cache_ready event.
+  #
+  #        # Do whatever with updated cache.
+  #        puts get_cache
+  #      end
+  #    end
+  #  end
+  #
   module TopologyCache
     include Topology
     
