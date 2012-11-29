@@ -344,14 +344,14 @@ static void
 recv_topology_response( uint16_t tag, void *data, size_t len, void *param0 ) {
   UNUSED( tag );
   if( len < sizeof(topology_response) ) {
-    error( "Invalid data length. (tag=0x%x len=%zu, where > %zu expected)", tag, len, sizeof(topology_response) );
+    error( "Invalid data length. (tag=%#x len=%zu, where > %zu expected)", tag, len, sizeof(topology_response) );
     return;
   }
   topology_response *res = data;
   struct send_request_param *param = param0;
 
   if( res->status != TD_RESPONSE_OK ){
-    warn( "Response other than TD_RESPONSE_OK received. (tag=0x%x, status=0x%x)", tag, res->status );
+    warn( "Response other than TD_RESPONSE_OK received. (tag=%#x, status=%#x)", tag, res->status );
   }
 
   if ( param->callback == NULL ) {
@@ -370,7 +370,7 @@ recv_subscribe_reply( uint16_t tag, void *data, size_t len, void *param0 ) {
   if( res->status == TD_RESPONSE_OK ){
     is_subscribed = true;
   }else{
-    error( "Failed to subscribe. (status=0x%x)", (int)res->status );
+    error( "Failed to subscribe. (status=%#x)", (int)res->status );
   }
 
   recv_topology_response(tag, data, len, param0);
@@ -384,7 +384,7 @@ recv_unsubscribe_reply( uint16_t tag, void *data, size_t len, void *param0 ) {
   if( res->status == TD_RESPONSE_OK ){
     is_subscribed = false;
   }else{
-    error( "Failed to unsubscribe. (status=0x%x)", (int)res->status );
+    error( "Failed to unsubscribe. (status=%#x)", (int)res->status );
   }
 
   recv_topology_response(tag, data, len, param0);
@@ -420,7 +420,7 @@ disable_topology_discovery( void ( *callback )( void *user_data, topology_respon
 static void
 recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
   unmark_transaction( (struct send_request_param *)user_data );
-  debug( "%s: 0x%x", __func__, (unsigned int)tag );
+  debug( "%s: %#x", __func__, (unsigned int)tag );
 
   switch ( tag ) {
   case TD_MSGTYPE_SUBSCRIBE_RESPONSE:
@@ -464,7 +464,7 @@ recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
     break;
 
   default:
-    error( "%s: Unknown message type: 0x%x", __func__, (unsigned int)tag );
+    error( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
     // TODO Should we call default handler for unknown tag?
     //  Not calling default handler may leak user_data,
     //  but calling default handler may seg fault if the message was completely corrupted.
@@ -475,7 +475,7 @@ recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
 
 static void
 recv_status_notification( uint16_t tag, void *data, size_t len ) {
-  debug( "%s: 0x%x", __func__, (unsigned int)tag );
+  debug( "%s: %#x", __func__, (unsigned int)tag );
   switch ( tag ) {
   case TD_MSGTYPE_LINK_STATUS_NOTIFICATION:
     recv_link_status_notification( tag, data, len );
@@ -490,14 +490,14 @@ recv_status_notification( uint16_t tag, void *data, size_t len ) {
     break;
 
   default:
-    warn( "%s: Unknown message type: 0x%x", __func__, (unsigned int)tag );
+    warn( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
   }
 }
 
 static void
 recv_request( const messenger_context_handle *handle,
               uint16_t tag, void *data, size_t len ) {
-  debug( "%s: 0x%x", __func__, (unsigned int)tag );
+  debug( "%s: %#x", __func__, (unsigned int)tag );
   switch ( tag ) {
   case TD_MSGTYPE_PING_REQUEST:
     // ping: topology service -> libtopology
@@ -505,7 +505,7 @@ recv_request( const messenger_context_handle *handle,
     break;
 
   default:
-    warn( "%s: Unknown message type: 0x%x", __func__, (unsigned int)tag );
+    warn( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
     break;
   }
 }
@@ -521,8 +521,8 @@ check_transaction_table( void *user_data ) {
   hash_entry *e;
   while (( e = iterate_hash_next( &iter ) ) != NULL ) {
     struct send_request_param *param = e->value;
-    warn( "Outstanding transaction still remains: 0x%#x", param->transaction_id );
-    warn( " message type is 0x%x", param->message_type );
+    warn( "Outstanding transaction still remains: %#x", param->transaction_id );
+    warn( " message type is %#x", param->message_type );
     char buf[ 32 ];
     warn( " called at %s", ctime_r( ( time_t * ) &param->called_at.tv_sec, buf ) );
   }
