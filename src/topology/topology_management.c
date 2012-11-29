@@ -27,9 +27,6 @@
 #include "topology_management.h"
 
 
-static const uint16_t INITIAL_DISCOVERY_PERIOD = 5;
-
-
 
 static void
 send_features_request( sw_entry *sw ) {

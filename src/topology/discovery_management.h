@@ -12,6 +12,7 @@
 
 typedef struct discovery_management_options {
   lldp_options lldp;
+  bool always_enabled;
 } discovery_management_options;
 
 bool init_discovery_management( discovery_management_options new_options );
