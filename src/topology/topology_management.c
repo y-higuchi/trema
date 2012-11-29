@@ -140,6 +140,7 @@ handle_switch_disconnected( uint64_t datapath_id, void *user_data ) {
     next = list->next;
     delete_port_notification( sw, list->data );
   }
+  info( "Switch del (%#" PRIx64 ")", datapath_id );
   notify_switch_status_for_all_user( sw );
 
   delete_sw_entry( sw );
@@ -177,6 +178,7 @@ handle_switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
     }
     port_entry *port = update_port_entry( sw, phy_port->port_no, phy_port->name );
     port->id = transaction_id;
+    info( "Port mod ([%#" PRIx64 "]:%u)", datapath_id, phy_port->port_no );
     update_port_notification( sw, port, phy_port );
     debug( "Updated features-reply from switch(%#" PRIx64 "), port_no(%u).",
            datapath_id, phy_port->port_no );
@@ -187,6 +189,7 @@ handle_switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
     if ( port->id == transaction_id ) {
       continue;
     }
+    info( "Port del ([%#" PRIx64 "]:%u)", datapath_id, port->port_no );
     delete_port_notification( sw, port );
     debug( "Deleted port(%u) in switch(%#" PRIx64 ")", port->port_no, datapath_id );
   }
@@ -214,6 +217,7 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
               phy_port.port_no, phy_port.name, datapath_id );
         return;
       }
+      info( "Port add (%#" PRIx64 ":%u)", datapath_id, phy_port.port_no );
       add_port_notification( sw, &phy_port );
       break;
 
@@ -223,6 +227,7 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
               phy_port.port_no, phy_port.name, datapath_id );
         return;
       }
+      info( "Port del (%#" PRIx64 ":%u)", datapath_id, phy_port.port_no );
       delete_port_notification( sw, port );
       break;
 
@@ -233,9 +238,11 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
         return;
       }
       if ( port->port_no != phy_port.port_no ) {
+        info( "Port mod (%#" PRIx64 ":%u->%u)", datapath_id, port->port_no, phy_port.port_no );
         delete_port_notification( sw, port );
         add_port_notification( sw, &phy_port );
       } else {
+        info( "Port mod (%#" PRIx64 ":%u)", datapath_id, phy_port.port_no );
         update_port_notification( sw, port, &phy_port );
       }
       break;

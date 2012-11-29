@@ -164,7 +164,7 @@ subscribe( const messenger_context_handle *handle, void *data, size_t len ) {
   topology_request *req = data;
 
   if ( len == 0 ) {
-    error( "Invalid topology subscribe request length(%u)", len );
+    error( "Invalid topology subscribe request length(%zu)", len );
     return;
   }
 
@@ -192,7 +192,7 @@ unsubscribe( const messenger_context_handle *handle, void *data, size_t len ) {
   topology_request *req = data;
 
   if ( len == 0 ) {
-    error( "Invalid topology unsubscribe request length(%u)", len );
+    error( "Invalid topology unsubscribe request length(%zu)", len );
     return;
   }
 
@@ -406,7 +406,7 @@ update_link_status( const messenger_context_handle *handle, void *data, size_t l
   uint8_t status = TD_RESPONSE_OK;
 
   if ( len != sizeof( topology_update_link_status ) ) {
-    error( "Invalid update link status request length(%z)", len );
+    error( "Invalid update link status request length(%zu)", len );
     status = TD_RESPONSE_INVALID;
     goto send_response;
   }
@@ -417,6 +417,7 @@ update_link_status( const messenger_context_handle *handle, void *data, size_t l
   link_status.to_portno = ntohs( req->to_portno );
   link_status.status = req->status;
 
+  info( "Link change req to '%d' (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.status, link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
   status = set_discovered_link_status( &link_status );
 
 send_response:
@@ -480,7 +481,7 @@ recv_ping_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
   UNUSED( user_data );
 
   if( len == 0 ){
-    error( "%s: Ping reply length was too short. (len=%z)", __func__, len );
+    error( "%s: Ping reply length was too short. (len=%zu)", __func__, len );
     return;
   }
 

@@ -274,7 +274,7 @@ recv_link_status_notification( uint16_t tag, void *data, size_t len ) {
 }
 
 
-// handle asynchronouse notification from topology
+// handle asynchronous notification from topology
 static void
 recv_port_status_notification( uint16_t tag, void *data, size_t len ) {
   UNUSED( tag );
@@ -335,7 +335,7 @@ recv_ping_request( const messenger_context_handle *handle, void *data, size_t le
   bool ret = send_reply_message( handle, TD_MSGTYPE_PING_RESPONSE,
                       buf->data, buf->length );
   if ( !ret ) {
-    warn( "Failed to respond to ping from topology. %d" );
+    warn( "Failed to respond to ping from topology." );
   }
   free_buffer( buf );
 }
