@@ -1,6 +1,7 @@
 require "trema/controller"
 
 module Trema
+  # module to add topology information notification handlers to Controller
   module Topology
     
     #
@@ -106,12 +107,13 @@ module Trema
     # Initialization before start_trema() call.
     # Initialize and subscribe to topology interface.
     # This method will be implicitly called inside Controller#run! between init_trema() and start_trema() calls.
-    # @note Be sure to initialize and subscribe to topology, or call super() if overriding this method.
+    # @note Be sure to initialize and subscribe to topology if overriding this method.
     #
     # @example
     #  class MyController < Controller
+    #    include Topology
     #    def start
-    #      super
+    #      super()
     #      # your application's pre-start_trema() call initialization here.
     #    end
     #  end
