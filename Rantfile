@@ -934,6 +934,7 @@ tests = [
   "objects/unittests/doubly_linked_list_test",
   "objects/unittests/ether_test",
   "objects/unittests/hash_table_test",
+  "objects/unittests/heap_utility_test",
   "objects/unittests/linked_list_test",
   "objects/unittests/log_test",
   "objects/unittests/packetin_filter_interface_test",
