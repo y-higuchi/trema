@@ -158,7 +158,7 @@ handle_subscribed_reply( void* self, topology_response *res ) {
     break;
 
   default:
-    warn( "%s: Abnormal subscription reply: 0x%x", __func__, (unsigned int)res->status );
+    warn( "%s: Abnormal subscription reply: %#x", __func__, (unsigned int)res->status );
   }
 }
 
@@ -168,7 +168,7 @@ handle_unsubscribed_reply( void* self, topology_response *res ) {
   if( res->status == TD_RESPONSE_NO_SUCH_SUBSCRIBER ) {
     warn( "Already unsubscribed from topology Service." );
   }else{
-    warn( "%s: Abnormal unsubscription reply: 0x%x", __func__, (unsigned int)res->status );
+    warn( "%s: Abnormal unsubscription reply: %#x", __func__, (unsigned int)res->status );
   }
   rb_iv_set( (VALUE)self, "@is_topology_ready", Qfalse );
 }
@@ -211,7 +211,7 @@ topology_unsubscribe_topology( VALUE self ) {
 static void
 handle_enable_topology_discovery_reply( void* self, topology_response *res ) {
   if( res->status != TD_RESPONSE_OK ){
-    warn( "%s: Abnormal reply: 0x%x", __func__, (unsigned int)res->status );
+    warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
     // FIXME Should failure of enable_topology_discovery notified to Ruby side?
     return;
   }
@@ -234,7 +234,7 @@ static void
 handle_disable_topology_discovery_reply( void* self, topology_response *res ) {
   UNUSED( self );
   if( res->status != TD_RESPONSE_OK ){
-    warn( "%s: Abnormal reply: 0x%x", __func__, (unsigned int)res->status );
+    warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
     // FIXME Should failure of disable_topology_discovery notified to Ruby side?
     return;
   }
