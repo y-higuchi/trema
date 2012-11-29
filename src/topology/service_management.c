@@ -358,17 +358,17 @@ set_discovered_link_status( topology_update_link_status *link_status ) {
 
   sw_entry *sw = lookup_sw_entry( &link_status->from_dpid );
   if ( sw == NULL ) {
-    info( "Not found datapath_id 0x%" PRIx64, link_status->from_dpid );
+    info( "Not found datapath_id %#" PRIx64, link_status->from_dpid );
     return TD_RESPONSE_INVALID;
   }
   port_entry *port = lookup_port_entry( sw, link_status->from_portno, NULL );
   if ( port == NULL ) {
-    info( "Not found port no %u. datapath_id 0x%" PRIx64, link_status->from_portno,
+    info( "Not found port no %u. datapath_id %#" PRIx64, link_status->from_portno,
           link_status->from_dpid );
     return TD_RESPONSE_INVALID;
   }
   if ( !port->up ) {
-    info( "port %u is down. datapath_id 0x%" PRIx64, link_status->from_portno,
+    info( "port %u is down. datapath_id %#" PRIx64, link_status->from_portno,
           link_status->from_dpid );
     // TODO reconsider behavior for setting link on port which is down.
     return TD_RESPONSE_INVALID;
@@ -417,7 +417,7 @@ update_link_status( const messenger_context_handle *handle, void *data, size_t l
   link_status.to_portno = ntohs( req->to_portno );
   link_status.status = req->status;
 
-  info( "Link change req to '%d' (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.status, link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
+  info( "Link change req to state '%d' (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.status, link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
   status = set_discovered_link_status( &link_status );
 
 send_response:
@@ -469,7 +469,7 @@ recv_request( const messenger_context_handle *handle,
       break;
 
     default:
-      notice( "recv_request: Invalid message type: 0x%x", (unsigned int)tag );
+      notice( "recv_request: Invalid message type: %#x", (unsigned int)tag );
       break;
   }
 }
@@ -506,7 +506,7 @@ recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
     break;
 
   default:
-    notice( "recv_reply: Invalid message type: 0x%x", (unsigned int)tag );
+    notice( "recv_reply: Invalid message type: %#x", (unsigned int)tag );
   }
 }
 

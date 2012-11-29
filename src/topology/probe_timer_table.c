@@ -307,7 +307,7 @@ debug( "!!!!%s!!!!", __func__ );
   }
 
   if ( entry->state != old_state ) {
-    debug( "Update probe state: %d <= %d by event %d. dpid 0x%" PRIx64 " %u.",
+    debug( "Update probe state: %d <= %d by event %d. dpid %#" PRIx64 " %u.",
            entry->state, old_state, event,
            entry->datapath_id, entry->port_no );
   }
