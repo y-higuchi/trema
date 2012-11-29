@@ -14,32 +14,30 @@ module Trema
     class Port
       attr_reader :dpid, :portno
       attr_reader :attributes
-      
-      def initialize( *args )
+
+      # @param [Hash] h Hash containing Port properties. Elements not listed in Options will be added to @attributes 
+      # @option h [Integer] :dpid Switch dpid which this port belongs
+      # @option h [Integer] :portno port number
+      def initialize( h )
+        raise ArgumentError, "Key element for Port missing in Hash" if h.values_at(:dpid, :portno).include? nil
+        
         @attributes = Hash.new
-        if args.length == 2 then
-          @dpid = args[0];
-          @portno = args[1];
-        elsif args.length == 1 then
-          raise ArgumentError, "Expected a Hash for argument. #{p args[0]}" unless args[0].is_a?(Hash)
-          h = args[0]
-          @dpid = h[:dpid]
-          @portno = h[:portno]
-          update_attributes( h )
-        else
-          raise ArgumentError, "Wrong number of arguments. #{p args}"
-        end
+        @dpid = h[:dpid]
+        @portno = h[:portno]
+        update_attributes( h )
         @dpid.freeze
         @portno.freeze 
       end
 
-      def update_attributes( hash )
-        hash.each_pair do |k,v|
+      # @param [Hash] h Hash containing Port attributes. Elements listed in Options will be ignored.
+      # @option (see #initialize)
+      def update_attributes( h )
+        h.each_pair do |k,v|
           next if k == :dpid or k == :portno
           @attributes[k] = v
         end
       end
-      
+
       def to_s
         "Port 0x#{@dpid.to_s(16)}:#{@portno.to_s} - #{@attributes.inspect}"
       end
@@ -49,32 +47,30 @@ module Trema
       attr_reader :from_dpid, :from_portno, :to_dpid, :to_portno
       attr_reader :attributes
       
-      def initialize( *args )
+      # @param [Hash] h Hash containing Link properties. Elements not listed in Options will be added to @attributes
+      # @option h [Integer] :from_dpid Switch dpid which this link departs from
+      # @option h [Integer] :from_portno port number of switch which this link departs from
+      # @option h [Integer] :to_dpid Switch dpid which this link peer to
+      # @option h [Integer] :to_portno port number of switch which this link peer to
+      def initialize( h )
+        raise ArgumentError, "Key element for Link missing in Hash" if h.values_at(:from_dpid, :from_portno, :to_dpid, :to_portno).include? nil
+
         @attributes = Hash.new
-        if args.length == 4 then
-          @from_dpid = args[FROM_DPID];
-          @from_portno = args[FROM_PORTNO];
-          @to_dpid = args[TO_DPID];
-          @to_portno = args[TO_PORTNO];
-        elsif args.length == 1 then
-          raise ArgumentError, "Expected a Hash for argument. #{p args[0]}" unless args[0].is_a?(Hash)
-          h = args[0]
-          @from_dpid = h[:from_dpid]
-          @from_portno = h[:from_portno]
-          @to_dpid = h[:to_dpid]
-          @to_portno = h[:to_portno]
-          update_attributes( h );
-        else
-          raise ArgumentError, "Wrong number of arguments. #{p args}"
-        end
+        @from_dpid = h[:from_dpid]
+        @from_portno = h[:from_portno]
+        @to_dpid = h[:to_dpid]
+        @to_portno = h[:to_portno]
+        update_attributes( h );
         @from_dpid.freeze
         @from_portno.freeze
         @to_dpid.freeze
         @to_portno.freeze
       end
       
-      def update_attributes( hash )
-        hash.each_pair do |k,v|
+      # @param [Hash] h Hash containing Link attributes. Elements listed in Options will be ignored.
+      # @option (see #initialize)
+      def update_attributes( h )
+        h.each_pair do |k,v|
           next if k == :from_dpid or k == :from_portno
           next if k == :to_dpid or k == :to_portno
           @attributes[k] = v
@@ -98,45 +94,50 @@ module Trema
       attr_reader :links_in, :links_out
       attr_reader :attributes
       
+      # @param [Hash] sw Hash containing Switch properties. Elements not listed in Options will be added to @attributes 
+      # @option sw [Integer] :dpid Switch dpid
       def initialize( sw )
+        raise ArgumentError, "Key element for Switch missing in Hash" unless sw.include? :dpid
+
         @attributes = Hash.new
-        if sw.is_a? Integer then
-          @dpid = sw
-        elsif sw.is_a? Hash then
-          @dpid = sw[:dpid]
-          update_attributes( sw )
-        else
-          raise ArgumentError, "Expected a Hash or Integer for argument. #{sw.inspect}"
-        end
+        @dpid = sw[:dpid]
+        update_attributes( sw )
         @dpid.freeze
         @ports = Hash.new
         @links_in = Hash.new
         @links_out = Hash.new
       end
       
+      # @param [Port] port Port instance to add to switch
       def add_port port
         @ports[port.portno] = port;
       end
       
+      # @param [Integer] portno Create a Port instance and add to switch
       def add_port_by_portno portno
-        @ports[portno] = Port.new @dpid, portno;
+        @ports[portno] = Port.new( { :dpid => @dpid, :portno => portno} )
       end
       
+      # @param [Port] port Port instance to delete from
       def del_port port
         @ports.delete( port.portno )
       end
       
+      # @param [Integer] portno port number to delete
       def del_port_by_portno portno
         @ports.delete( portno );
       end
       
-      def update_attributes( hash )
-        hash.each_pair do |k,v|
+      # @param [Hash] h Hash containing Switch attributes. Elements listed in Options will be ignored.
+      # @option (see #initialize)
+      def update_attributes( h )
+        h.each_pair do |k,v|
           next if k == :dpid
           @attributes[k] = v
         end
       end
       
+      # (see Port#initialize)
       def update_port_by_hash port
         raise ArgumentError, "Key element for Port missing in Hash" unless port.include? :portno
 
@@ -231,7 +232,7 @@ module Trema
       end 
       
       # Delete a link from Topology cache.
-      # @param [Array] key
+      # @param [Array<Integer,Integer,Integer,Integer>] key
       #   4 element array. [from.dpid, from.port_no, to.dpid, to.port_no]
       def del_link_by_key_tuple key
         sw_from = @switches[ key[FROM_DPID] ];
@@ -242,11 +243,17 @@ module Trema
         @links.delete( key );
       end
       
-      def lookup_link_by_hash hash
-        key = [ hash[:from_dpid], hash[:from_port], hash[:to_dpid], hash[:to_portno] ];
+      # @param [Hash] h look up a link instance using key elements listed in Options
+      # @option (see Link#initialize)
+      def lookup_link_by_hash h
+        key = [ h[:from_dpid], h[:from_port], h[:to_dpid], h[:to_portno] ];
         @links[ key ];
       end
 
+      # Update Switch instance. Switch instance will be created if it does not exist.
+      # Switch instance will be removed if the state is not up 
+      # @param [Hash] sw switch instance info hash 
+      # @option (see Switch#initialize)
       def update_switch_by_hash sw
         raise ArgumentError, "Key element for Switch missing in Hash" unless sw.include? :dpid
         
@@ -262,6 +269,10 @@ module Trema
         end
       end
       
+      # Update Link instance. Link instance will be created if it does not exist.
+      # Link instance will be removed if the state is not up 
+      # @param [Hash] link link instance info hash 
+      # @option (see Link#initialize)
       def update_link_by_hash link
         raise ArgumentError, "Key element for Link missing in Hash" if link.values_at(:from_dpid, :from_portno, :to_dpid, :to_portno).include? nil
         
@@ -278,13 +289,17 @@ module Trema
         end
       end
       
+      # Update Port instance. Port instance will be created if it does not exist.
+      # Port instance will be removed if the state is not up 
+      # @param [Hash] port port instance info hash 
+      # @option (see Port#initialize)
       def update_port_by_hash port
         raise ArgumentError, "Key element for Port missing in Hash" if port.values_at(:dpid, :portno).include? nil
         
         if port[:up] then
           s = lookup_switch_by_dpid( port[:dpid] )
           if s == nil then
-            s = add_switch Topology::Switch.new( port[:dpid] )
+            s = add_switch Topology::Switch.new( {:dpid => port[:dpid]} )
           end
           s.update_port_by_hash( port )
         else
@@ -327,7 +342,7 @@ module Trema
     end
     
     def cache_ready?
-      @all_link and @all_switch
+      @all_link and @all_switch and @all_port
     end
     
     #
@@ -347,13 +362,37 @@ module Trema
     #  event call back will be executed as a side-effect of this function call.
     def rebuild_cache
       @need_cache_ready_notify = true
+      @cache_up_to_date = false
       @cache = Topology::Cache.new
       @all_link = false
       @all_switch = false
+      @all_port = false
       
       send_all_switch_status_request
       send_all_link_status_request
       send_all_port_status_request
+    end
+    
+    def cache_up_to_date?
+      cache_ready? and @cache_up_to_date
+    end
+    
+    # call inside switch_status_updated handler to update cache to latest state
+    # @note cache will be automatically updated after handler exit if this method was not called.
+    def update_cache_by_switch_hash sw
+      _switch_status_updated sw
+    end
+
+    # call inside link_status_updated handler to update cache to latest state
+    # @note cache will be automatically updated after handler exit if this method was not called.
+    def update_cache_by_link_hash link
+      _link_status_updated link
+    end
+
+    # call inside port_status_updated handler to update cache to latest state
+    # @note cache will be automatically updated after handler exit if this method was not called.
+    def update_cache_by_port_hash port
+      _port_status_updated port
     end
     
     ######################
@@ -361,32 +400,20 @@ module Trema
     ######################
     def _switch_status_updated sw
       @cache = Topology::Cache.new unless @cache
-      begin
-        @cache.update_switch_by_hash( sw )
-      rescue ArgumentError => e
-        error "Invallid Switch Hash specified.  #{sw.inspect}"
-        error " #{e.to_s}"
-      end
+      @cache.update_switch_by_hash( sw )
+      @cache_up_to_date = true
     end
 
     def _port_status_updated port
       @cache = Topology::Cache.new unless @cache
-      begin
-        @cache.update_port_by_hash( port )
-      rescue ArgumentError => e
-        error "Invallid Port Hash specified. #{port.inspect}"
-        error " #{e.to_s}"
-      end
+      @cache.update_port_by_hash( port )
+      @cache_up_to_date = true
     end
 
     def _link_status_updated link
       @cache = Topology::Cache.new unless @cache
-      begin
-        @cache.update_link_by_hash( link )
-      rescue ArgumentError => e
-        error "Invalid Link Hash specified. #{link.inspect}"
-        error " #{e.to_s}"
-      end
+      @cache.update_link_by_hash( link )
+      @cache_up_to_date = true
     end
 
     def _all_link_status_reply links
@@ -397,6 +424,8 @@ module Trema
 
     def _all_port_status_reply ports
       ports.each {|e| _port_status_updated(e) }
+      @all_port = true
+      notify_cache_ready if @need_cache_ready_notify and cache_ready? 
     end
 
     def _all_switch_status_reply switches
@@ -405,6 +434,7 @@ module Trema
       notify_cache_ready if @need_cache_ready_notify and cache_ready? 
     end
 
+    # @private 
     def notify_cache_ready
       if self.respond_to? :cache_ready then
         cache_ready @cache

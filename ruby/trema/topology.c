@@ -61,7 +61,8 @@ switch_status_to_hash( const topology_switch_status* sw_status ) {
 
 static void
 handle_switch_status_updated( void* self, const topology_switch_status* sw_status ) {
-  UNUSED( sw_status );
+  rb_iv_set( ( VALUE ) self, "@cache_up_to_date",  Qfalse);
+
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "switch_status_updated" ) ) == Qtrue ) {
     VALUE sw = switch_status_to_hash( sw_status );
     rb_funcall( ( VALUE ) self, rb_intern( "switch_status_updated" ), 1, sw );
@@ -96,6 +97,8 @@ port_status_to_hash( const topology_port_status* port_status ) {
 
 static void
 handle_port_status_updated( void* self, const topology_port_status* port_status ) {
+  rb_iv_set( ( VALUE ) self, "@cache_up_to_date",  Qfalse);
+
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "port_status_updated" ) ) == Qtrue ) {
     VALUE port = port_status_to_hash( port_status );
     rb_funcall( ( VALUE ) self, rb_intern( "port_status_updated" ), 1, port );
@@ -130,6 +133,8 @@ link_status_to_hash( const topology_link_status* link_status ) {
 
 static void
 handle_link_status_updated( void* self, const topology_link_status* link_status ) {
+  rb_iv_set( ( VALUE ) self, "@cache_up_to_date",  Qfalse);
+
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "link_status_updated" ) ) == Qtrue ) {
     VALUE link = link_status_to_hash( link_status );
     rb_funcall( ( VALUE ) self, rb_intern( "link_status_updated" ), 1, link );
