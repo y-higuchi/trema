@@ -16,7 +16,6 @@
 
 static bool g_discovery_enabled = false;
 
-static const uint16_t INITIAL_DISCOVERY_PERIOD = 5;
 static discovery_management_options options;
 
 bool
@@ -26,6 +25,10 @@ init_discovery_management( discovery_management_options new_options ) {
 
   init_probe_timer_table();
   result = init_lldp( new_options.lldp );
+
+  if( new_options.always_enabled ) {
+    enable_discovery();
+  }
 
   return result;
 }
@@ -172,6 +175,7 @@ enable_discovery( void ) {
 
 void
 disable_discovery( void ) {
+  if( options.always_enabled ) return;
   if ( !g_discovery_enabled ) {
     warn( "Topology Discovery was not enabled." );
   }

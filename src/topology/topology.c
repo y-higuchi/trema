@@ -32,9 +32,10 @@
 #include "topology_management.h"
 #include "discovery_management.h"
 
-static char short_options[] = "m:io:r:";
+static char short_options[] = "am:io:r:";
 
 static struct option long_options[] = {
+  { "always_run_discovery", no_argument, NULL, 'a'},
   { "lldp_mac_dst", required_argument, NULL, 'm' },
   { "lldp_over_ip", no_argument, NULL, 'i' },
   { "lldp_ip_src", required_argument, NULL, 'o' },
@@ -56,6 +57,7 @@ usage() {
     "topology manager\n"
     "Usage: %s [OPTION]...\n"
     "\n"
+    "  -a, --always_run_discovery      discovery will always be enabled\n"
     "  -m, --lldp_mac_dst=MAC_ADDR     destination Mac address for sending LLDP\n"
     "  -i, --lldp_over_ip              send LLDP messages over IP\n"
     "  -o, --lldp_ip_src=IP_ADDR       source IP address for sending LLDP over IP\n"
@@ -134,10 +136,16 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
   options->discovery.lldp.lldp_over_ip = false;
   options->discovery.lldp.lldp_ip_src = 0;
   options->discovery.lldp.lldp_ip_dst = 0;
+  options->discovery.always_enabled = false;
 
   int c;
   while ( ( c = getopt_long( *argc, *argv, short_options, long_options, NULL ) ) != -1 ) {
     switch ( c ) {
+      case 'a':
+        options->discovery.always_enabled = true;
+        info( "Discovery will always be neabled." );
+        break;
+
       case 'm':
         if ( set_mac_address_from_string( options->discovery.lldp.lldp_mac_dst, optarg ) == false ) {
           usage();
