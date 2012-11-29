@@ -213,6 +213,7 @@ debug( "!!!!%s!!!!", __func__ );
           entry->to_datapath_id = *dpid;
           entry->to_port_no = port_no;
           entry->link_up = true;
+          info( "Link up (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
           uint8_t result = set_discovered_link_status( &link_status );
           if ( result == TD_RESPONSE_OK ) {
             peer_link_status_update( entry );
@@ -248,6 +249,7 @@ debug( "!!!!%s!!!!", __func__ );
             entry->to_datapath_id = 0;
             entry->to_port_no = 0;
             entry->link_up = false;
+            info( "Link down (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
             uint8_t result = set_discovered_link_status( &link_status );
             if ( result == TD_RESPONSE_OK ) {
               peer_link_status_update( entry );
@@ -287,10 +289,11 @@ debug( "!!!!%s!!!!", __func__ );
             link_status.to_dpid = *dpid;
             link_status.to_portno = port_no;
             link_status.status = TD_LINK_UNSTABLE;
+            info( "Link unstable (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
             uint8_t result = set_discovered_link_status( &link_status );
             if ( result != TD_RESPONSE_OK ) {
               // TODO: Is state transition of set link statsu error case OK?
-              warn( "Failed to set (0x%llx,%d)->(0x%llx,%d) status to TD_LINK_UNSTABLE.", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
+              warn( "Failed to set (%#" PRIx64 ",%d)->(%#" PRIx64 ",%d) status to TD_LINK_UNSTABLE.", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
             }
           }
           break;
