@@ -76,7 +76,8 @@ static VALUE
 port_status_to_hash( const topology_port_status* port_status ) {
   VALUE port = rb_hash_new();
   rb_hash_aset( port, ID2SYM( rb_intern( "dpid" ) ), ULL2NUM( port_status->dpid ) );
-  rb_hash_aset( port, ID2SYM( rb_intern( "port_no" ) ), INT2FIX( (int)port_status->port_no ) );
+  // TODO document warning about name difference. port_no in C, portno in Ruby
+  rb_hash_aset( port, ID2SYM( rb_intern( "portno" ) ), INT2FIX( (int)port_status->port_no ) );
   rb_hash_aset( port, ID2SYM( rb_intern( "name" ) ), rb_str_new2( port_status->name ) );
   char macaddr[] = "FF:FF:FF:FF:FF:FF";
   const uint8_t* mac = port_status->mac;
@@ -84,6 +85,12 @@ port_status_to_hash( const topology_port_status* port_status ) {
   rb_hash_aset( port, ID2SYM( rb_intern( "mac" ) ), rb_str_new2( macaddr ) );
   rb_hash_aset( port, ID2SYM( rb_intern( "external" ) ), INT2FIX( (int)port_status->external ) );
   rb_hash_aset( port, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)port_status->status ) );
+  // TODO document the definition of Port "up" state
+  if ( port_status->status == TD_PORT_UP ) {
+    rb_hash_aset( port, ID2SYM( rb_intern( "up" ) ), Qtrue );
+  } else {
+    rb_hash_aset( port, ID2SYM( rb_intern( "up" ) ), Qfalse );
+  }
   return port;
 }
 
@@ -103,9 +110,9 @@ static VALUE
 link_status_to_hash( const topology_link_status* link_status ) {
   VALUE link = rb_hash_new();
   rb_hash_aset( link, ID2SYM( rb_intern( "from_dpid" ) ), ULL2NUM( link_status->from_dpid ) );
-  rb_hash_aset( link, ID2SYM( rb_intern( "from_port_no" ) ), INT2FIX( (int)link_status->from_portno ) );
+  rb_hash_aset( link, ID2SYM( rb_intern( "from_portno" ) ), INT2FIX( (int)link_status->from_portno ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "to_dpid" ) ), ULL2NUM( link_status->to_dpid ) );
-  rb_hash_aset( link, ID2SYM( rb_intern( "to_port_no" ) ), INT2FIX( (int)link_status->to_portno ) );
+  rb_hash_aset( link, ID2SYM( rb_intern( "to_portno" ) ), INT2FIX( (int)link_status->to_portno ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)link_status->status ) );
   // TODO document the definition of Link "up" state
   if( link_status->status != TD_LINK_DOWN ) {

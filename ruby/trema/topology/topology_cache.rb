@@ -39,6 +39,10 @@ module Trema
           @attributes[k] = v
         end
       end
+      
+      def to_s
+        "Port 0x#{@dpid.to_s(16)}:#{@portno.to_s} - #{@attributes.inspect}"
+      end
     end
     
     class Link
@@ -76,6 +80,10 @@ module Trema
           @attributes[k] = v
         end
       end
+      
+      def to_s
+        "Link (0x#{@from_dpid.to_s(16)}:#{@from_portno.to_s})->(0x#{@to_dpid.to_s(16)}:#{@to_portno.to_s}) - #{@attributes.inspect}"
+      end
     end
     
     class Switch
@@ -98,7 +106,7 @@ module Trema
           @dpid = sw[:dpid]
           update_attributes( sw )
         else
-          raise ArgumentError, "Expected a Hash or Integer for argument. #{p sw}"
+          raise ArgumentError, "Expected a Hash or Integer for argument. #{sw.inspect}"
         end
         @dpid.freeze
         @ports = Hash.new
@@ -111,7 +119,7 @@ module Trema
       end
       
       def add_port_by_portno portno
-        @ports[portno] = Port.new portno;
+        @ports[portno] = Port.new @dpid, portno;
       end
       
       def del_port port
@@ -127,6 +135,34 @@ module Trema
           next if k == :dpid
           @attributes[k] = v
         end
+      end
+      
+      def update_port_by_hash port
+        raise ArgumentError, "Key element for Port missing in Hash" unless port.include? :portno
+
+        if port[:up] then
+          portno = port[:portno]
+          add_port_by_portno portno if not @ports.include? portno
+          @ports[portno].update_attributes port
+        else
+          @ports.delete( port[:portno] )
+        end
+      end
+      
+      def to_s
+        s = "Switch 0x#{@dpid.to_s(16)} - #{@attributes.inspect}\n"
+        @ports.each_pair do |k,v|
+          s += " #{v.to_s}\n"
+        end
+        s += " Links_in\n"
+        @links_in.each_pair do |k,v|
+          s += "  <=0x#{k[FROM_DPID].to_s(16)}:#{k[FROM_PORTNO]}\n"
+        end
+        s += " Links_out\n"
+        @links_out.each_pair do |k,v|
+          s += "  =>0x#{k[TO_DPID].to_s(16)}:#{k[TO_PORTNO]}\n"
+        end
+        return s
       end
     end
     
@@ -207,9 +243,69 @@ module Trema
       end
       
       def lookup_link_by_hash hash
-        key = [ hash[:from_dpid], hash[:from_port], hash[:to_dpid], hash[:to_protno] ];
+        key = [ hash[:from_dpid], hash[:from_port], hash[:to_dpid], hash[:to_portno] ];
         @links[ key ];
       end
+
+      def update_switch_by_hash sw
+        raise ArgumentError, "Key element for Switch missing in Hash" unless sw.include? :dpid
+        
+        if sw[:up] then
+          s = lookup_switch_by_dpid( sw[:dpid] )
+          if s != nil then
+            s.update_attributes( sw )
+          else
+            add_switch Topology::Switch.new( sw )
+          end
+        else
+          del_switch_by_dpid sw[:dpid]
+        end
+      end
+      
+      def update_link_by_hash link
+        raise ArgumentError, "Key element for Link missing in Hash" if link.values_at(:from_dpid, :from_portno, :to_dpid, :to_portno).include? nil
+        
+        if link[:up] then
+          l = lookup_link_by_hash( link )
+          if l != nil then
+            # link exist => update attributes
+            l.update_attributes( link )
+          else
+            add_link Topology::Link.new( link )
+          end
+        else
+          del_link_by_key_elements(link[:from_dpid],link[:from_portno],link[:to_dpid],link[:to_portno])
+        end
+      end
+      
+      def update_port_by_hash port
+        raise ArgumentError, "Key element for Port missing in Hash" if port.values_at(:dpid, :portno).include? nil
+        
+        if port[:up] then
+          s = lookup_switch_by_dpid( port[:dpid] )
+          if s == nil then
+            s = add_switch Topology::Switch.new( port[:dpid] )
+          end
+          s.update_port_by_hash( port )
+        else
+          s = lookup_switch_by_dpid( port[:dpid] )
+          if s != nil then
+            s.update_port_by_hash( port )
+          end
+        end
+      end
+      
+      def to_s
+        s = "[Topology Cache]\n"
+        @switches.each_pair { |k,v|
+          s += v.to_s
+        }
+        @links.each_pair do |k,v|
+          s += "#{v.to_s}\n"
+        end
+        return s
+      end
+      
     end
     
   end
@@ -246,8 +342,9 @@ module Trema
     # 
     # Rebuilds topology cache.
     # cache_ready will be called on cache rebuild complete
-    # @note  send_all_\{switch,link,port\}_status_request will be invoked internally thus 
-    #        all_\{switch,link,port\}_status_reply event call back will be executed.
+    # @note  send_all_\\{switch,link,port\\}_status_request will be called 
+    #  internally thus all_\\{switch,link,port\\}_status_reply 
+    #  event call back will be executed as a side-effect of this function call.
     def rebuild_cache
       @need_cache_ready_notify = true
       @cache = Topology::Cache.new
@@ -264,68 +361,56 @@ module Trema
     ######################
     def _switch_status_updated sw
       @cache = Topology::Cache.new unless @cache
-      
-      if sw[:up] then
-        s = @cache.lookup_switch_by_dpid( sw[:dpid] )
-        if s != nil then
-          s.update_attributes( sw )
-        else
-          @cache.add_switch Topology::Switch.new( sw )
-        end
-      else
-        @cache.del_switch_by_dpid sw[:dpid]
+      begin
+        @cache.update_switch_by_hash( sw )
+      rescue ArgumentError => e
+        error "Invallid Switch Hash specified.  #{sw.inspect}"
+        error " #{e.to_s}"
       end
     end
-    
+
     def _port_status_updated port
       @cache = Topology::Cache.new unless @cache
-      s = @cache.lookup_switch_by_dpid( port[:dpid] )
-      if s == nil then
-        s = @cache.add_switch Topology::Switch.new( port[:dpid] )
+      begin
+        @cache.update_port_by_hash( port )
+      rescue ArgumentError => e
+        error "Invallid Port Hash specified. #{port.inspect}"
+        error " #{e.to_s}"
       end
-      
-      # TODO implement add port
     end
-    
+
     def _link_status_updated link
       @cache = Topology::Cache.new unless @cache
-      
-      if link[:up] then
-        l = @cache.lookup_link_by_hash( link )
-        if l != nil then
-          # link exist => update attributes
-          l.update_attributes( link )
-        else
-          @cache.add_link Topology::Link.new( link )
-        end
-      else
-        @cache.del_link_by_key_elements(link[:from_dpid],link[:from_portno],link[:to_dpid],link[:to_portno])
-      end  
+      begin
+        @cache.update_link_by_hash( link )
+      rescue ArgumentError => e
+        error "Invalid Link Hash specified. #{link.inspect}"
+        error " #{e.to_s}"
+      end
     end
-    
+
     def _all_link_status_reply links
       links.each {|e| _link_status_updated(e) }
       @all_link = true
       notify_cache_ready if @need_cache_ready_notify and cache_ready? 
     end
-    
+
     def _all_port_status_reply ports
       ports.each {|e| _port_status_updated(e) }
     end
-    
+
     def _all_switch_status_reply switches
       switches.each {|e| _switch_status_updated(e) }
       @all_switch = true
       notify_cache_ready if @need_cache_ready_notify and cache_ready? 
     end
-    
+
     def notify_cache_ready
       if self.respond_to? :cache_ready then
         cache_ready @cache
       end
       @need_cache_ready_notify = false
     end
-
   end
 end
 
