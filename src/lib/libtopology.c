@@ -465,10 +465,6 @@ recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
 
   default:
     error( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
-    // TODO Should we call default handler for unknown tag?
-    //  Not calling default handler may leak user_data,
-    //  but calling default handler may seg fault if the message was completely corrupted.
-    recv_topology_response( tag, data, len, user_data );
   }
 }
 

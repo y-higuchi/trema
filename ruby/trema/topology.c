@@ -240,7 +240,7 @@ handle_disable_topology_discovery_reply( void* self, topology_response *res ) {
   UNUSED( self );
   if( res->status != TD_RESPONSE_OK ){
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
-    // FIXME Should failure of disable_topology_discovery notified to Ruby side?
+    // TODO Should failure of disable_topology_discovery notified to Ruby side?
     return;
   }
   // TODO Should successful disable_topology_discovery call be notified to Ruby side?
