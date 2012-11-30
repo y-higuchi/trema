@@ -34,7 +34,10 @@ module Trema
     #
     # @param [Hash] sw_stat
     #   Hash containing info about updated switch.
-    # TODO Add param description
+    # @option sw_stat [Integer] :dpid dpid of the switch
+    # @option sw_stat [Integer] :status status of the switch. Refer to enum topology_switch_status_type in topology_service_interface.h
+    # @option sw_stat [Boolean] :up true if status is TD_SWITCH_UP
+    # TODO define constants which corresponds to enum topology_switch_status_type.
     #
     handler :switch_status_updated
 
@@ -45,7 +48,14 @@ module Trema
     #
     # @param [Hash] port_stat
     #   Hash containing info about updated port.
-    # TODO Add param description
+    # @option port_stat [Integer] :dpid dpid of the switch
+    # @option port_stat [Integer] :portno port number. Note that attribute name differ from C structs.
+    # @option port_stat [String] :name name of the port
+    # @option port_stat [String] :mac mac address
+    # @option port_stat [Integer] :external external flag of the port. Refer to enum topology_port_external_type in topology_service_interface.h
+    # @option port_stat [Integer] :status status of the port. Refer to enum topology_port_status_type in topology_service_interface.h
+    # @option port_stat [Boolean] :up true if status is TD_PORT_UP
+    # TODO define constants which corresponds to enum topology_port_status_type, topology_port_external_type.
     #
     handler :port_status_updated
     
@@ -56,7 +66,14 @@ module Trema
     #
     # @param [Hash] link_stat
     #   Hash containing info about updated link.
-    # TODO Add param description
+    # @option link_stat [Integer] :from_dpid dpid of the switch which the link departs
+    # @option link_stat [Integer] :from_portno port number of the switch which the link departs
+    # @option link_stat [Integer] :to_dpid dpid of the switch which the link arraives
+    # @option link_stat [Integer] :to_portno port number of the switch which the link arrives
+    # @option link_stat [Integer] :status status of the link. Refer to enum topology_link_status_type in topology_service_interface.h
+    # @option link_stat [Boolean] :up true if status is NOT TD_LINK_DOWN, false otherwise.
+    # @option link_stat [Boolean] :unstable true if status is TD_LINK_UNSTABLE, false otherwise.
+    # TODO define constants which corresponds to enum topology_link_status_type.
     #
     handler :link_status_updated
     
