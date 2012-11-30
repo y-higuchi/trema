@@ -503,9 +503,6 @@ end
 
 show_topology_objects = [
   "show_topology.o",
-  "show_topology_csv.o",
-  "show_topology_dsl.o",
-  "show_topology_graph_easy.o",
 ].collect do | each |
   File.join topology_examples_objects_dir, each
 end
