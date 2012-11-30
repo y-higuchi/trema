@@ -129,7 +129,6 @@ typedef struct topology_port_status {
   uint8_t external;     // enum topology_port_external_type
   uint8_t status;       // enum topology_port_status_type
   uint8_t pad[ 6 ];     // 6 = 8 - (2+16+6+1+1)%8
-  // TODO add member from port_stats info -> current topology does not obtain port stats
 } __attribute__( ( packed ) ) topology_port_status;
 
 enum topology_port_status_type {
@@ -148,7 +147,6 @@ typedef struct topology_switch_status {
   uint64_t dpid;
   uint8_t status;       // enum topology_switch_status_type
   uint8_t pad[7];       // 7 = 8 - (1)%8
-  // TODO add member from feature info
 } __attribute__( ( packed ) ) topology_switch_status;
 
 enum topology_switch_status_type {
@@ -157,7 +155,6 @@ enum topology_switch_status_type {
 };
 
 
-// TODO define discovery ignore control message
 
 #endif // TOPOLOGY_SERVICE_INTERFACE_H
 
