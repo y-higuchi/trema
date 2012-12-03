@@ -584,6 +584,14 @@ add_callback_link_status_updated(
 }
 
 
+static void
+free_all_transaction_table( void *key, void *value, void *user_data ) {
+  UNUSED( key );
+  UNUSED( user_data );
+  xfree( value );
+}
+
+
 bool
 finalize_libtopology() {
   xfree( topology_name );
@@ -593,6 +601,13 @@ finalize_libtopology() {
   xfree( libtopology_queue_name );
   libtopology_queue_name = NULL;
   delete_timer_event( check_transaction_table, transaction_table );
+
+  assert( transaction_table != NULL );
+  if( transaction_table->length > 0 ) {
+    warn( "%u outstanding transaction left.", transaction_table->length );
+    check_transaction_table( transaction_table );
+    foreach_hash( transaction_table, free_all_transaction_table, NULL );
+  }
   delete_hash( transaction_table );
   transaction_table = NULL;
 
