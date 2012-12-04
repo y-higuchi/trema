@@ -407,12 +407,12 @@ unsubscribe_topology( void ( *callback )( void *user_data, topology_response *re
 }
 
 bool
-enable_topology_discovery( void ( *callback )( void *user_data, topology_response *res ), void *user_data ) {
+enable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
   return send_request( TD_MSGTYPE_ENABLE_DISCOVERY_REQUEST, callback, user_data );
 }
 
 bool
-disable_topology_discovery( void ( *callback )( void *user_data, topology_response *res ), void *user_data ) {
+disable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
   return send_request( TD_MSGTYPE_ENABLE_DISCOVERY_REQUEST, callback, user_data );
 }
 

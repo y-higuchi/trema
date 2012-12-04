@@ -61,8 +61,8 @@ bool set_link_status( const topology_update_link_status *link_status,
                       void *user_data );
 
 
-bool enable_topology_discovery( void ( *callback )( void *user_data, topology_response *res ), void *user_data );
-bool disable_topology_discovery( void ( *callback )( void *user_data, topology_response *res ), void *user_data );
+bool enable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data );
+bool disable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data );
 // TODO Future work: implement discovery control (port masking, etc.) methods
 //bool add_discovery_ignore_switch( uint64_t dpid );
 //bool remove_discovery_ignore_switch( uint64_t dpid );

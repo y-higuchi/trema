@@ -214,7 +214,7 @@ topology_unsubscribe_topology( VALUE self ) {
 }
 
 static void
-handle_enable_topology_discovery_reply( void* self, topology_response *res ) {
+handle_enable_topology_discovery_reply( void* self, const topology_response *res ) {
   if( res->status != TD_RESPONSE_OK ){
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
     // FIXME Should failure of enable_topology_discovery notified to Ruby side?
@@ -236,7 +236,7 @@ topology_enable_topology_discovery( VALUE self ) {
 }
 
 static void
-handle_disable_topology_discovery_reply( void* self, topology_response *res ) {
+handle_disable_topology_discovery_reply( void* self, const topology_response *res ) {
   UNUSED( self );
   if( res->status != TD_RESPONSE_OK ){
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
