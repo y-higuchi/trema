@@ -594,6 +594,10 @@ free_all_transaction_table( void *key, void *value, void *user_data ) {
 
 bool
 finalize_libtopology() {
+  if ( topology_name == NULL || libtopology_queue_name == NULL ) {
+    debug( "already finalized" );
+    return false;
+  }
   xfree( topology_name );
   topology_name = NULL;
   delete_message_received_callback( libtopology_queue_name, recv_status_notification );
