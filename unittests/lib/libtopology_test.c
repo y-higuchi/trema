@@ -192,12 +192,12 @@ callback_topology_response_end_no_const( void *user_data, topology_response *res
   stop_messenger();
 }
 
-static const topology_switch_status dummy_switch_up = {
+static const topology_switch_status dummy_switch_status_up = {
     .dpid = 0x1234,
     .status = TD_SWITCH_UP,
 };
 
-static const topology_port_status dummy_port_up = {
+static const topology_port_status dummy_port_status_up = {
     .dpid = 0x1234,
     .port_no = 42,
 //           123456789012345
@@ -207,7 +207,7 @@ static const topology_port_status dummy_port_up = {
     .status = TD_PORT_UP,
 };
 
-static const topology_link_status dummy_link_up = {
+static const topology_link_status dummy_link_status_up = {
     .from_dpid = 0x1234,
     .from_portno = 42,
     .to_dpid = 0x5678,
@@ -220,6 +220,9 @@ static const topology_response dummy_response_ok = {
 };
 static const topology_response dummy_response_already_subscribed = {
     .status = TD_RESPONSE_ALREADY_SUBSCRIBED,
+};
+static const topology_response dummy_response_no_such_subscriber = {
+    .status = TD_RESPONSE_NO_SUCH_SUBSCRIBER,
 };
 
 
@@ -326,7 +329,7 @@ static void
 test_init_libtopology() {
   const char* topology_name = TOPOLOGY_NAME;
   const char* topology_client_name_base = TOPOLOGY_CLIENT_NAME_BASE;
-  char* topology_client_name = xcalloc( 1, strlen(topology_client_name_base) + (size_t)(log10(INT_MAX)+.5) + 1 );
+  char* topology_client_name = xcalloc( 1, strlen(topology_client_name_base) + (size_t)(ceil(log10(INT_MAX))) + 1 );
 
   sprintf( topology_client_name, TOPOLOGY_CLIENT_NAME_BASE "%d", getpid() );
 
@@ -409,8 +412,8 @@ test_duplicate_subscribe_topology() {
 
   init_libtopology( TOPOLOGY_NAME );
 
-  test_is_subscribed = false;
   // create dummy topology service responding ok response
+  test_is_subscribed = false;
   assert_true( add_message_requested_callback( TOPOLOGY_NAME, helper_respond_subscribe ) );
 
   void* user_data = (void*)0x1234;
@@ -432,6 +435,7 @@ test_duplicate_subscribe_topology() {
   start_messenger();
   start_event_handler();
 
+  // remove dummy topology service responding ok response
   test_is_subscribed = false;
   assert_true( delete_message_requested_callback( TOPOLOGY_NAME, helper_respond_subscribe ) );
 
@@ -464,16 +468,234 @@ test_unsubscribe_topology() {
   finalize_libtopology_mock();
 }
 
+static bool test_is_unsubscribed = false;
+static void
+helper_respond_unsubscribe( const messenger_context_handle *handle, uint16_t tag,
+                          void *data, size_t len ) {
+
+  UNUSED( data );
+  UNUSED( len );
+
+  assert_true( tag == TD_MSGTYPE_UNSUBSCRIBE_REQUEST );
+
+  buffer *reply = alloc_buffer_with_length( sizeof( topology_response ) );
+  topology_response *response = append_back_buffer( reply, sizeof( topology_response ) );
+  memset( response, 0, sizeof( topology_response ) );
+
+  if( test_is_unsubscribed ) {
+    response->status = TD_RESPONSE_NO_SUCH_SUBSCRIBER;
+  } else {
+    response->status = TD_RESPONSE_OK;
+    test_is_unsubscribed = true;
+  }
+
+  send_reply_message( handle, TD_MSGTYPE_UNSUBSCRIBE_RESPONSE,
+                      reply->data, reply->length );
+  free_buffer( reply );
+}
+
+
+static void
+test_duplicate_unsubscribe_topology() {
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  init_libtopology( TOPOLOGY_NAME );
+
+  // create dummy topology service responding ok response
+  test_is_subscribed = false;
+  assert_true( add_message_requested_callback( TOPOLOGY_NAME, helper_respond_unsubscribe ) );
+
+  void* user_data = (void*)0x1234;
+  bool result = false;
+  expect_value( callback_topology_response_no_const, user_data, user_data );
+  expect_memory( callback_topology_response_no_const, res, &dummy_response_ok, sizeof(dummy_response_ok) );
+
+  result = unsubscribe_topology( callback_topology_response_no_const, user_data );
+  assert_true( result );
+
+  expect_value( callback_topology_response_end_no_const, user_data, user_data );
+  expect_memory( callback_topology_response_end_no_const, res, &dummy_response_no_such_subscriber, sizeof(dummy_response_no_such_subscriber) );
+
+  result = unsubscribe_topology( callback_topology_response_end_no_const, user_data );
+  assert_true( result );
+
+
+  // start pump
+  start_messenger();
+  start_event_handler();
+
+  // remove dummy topology service responding ok response
+  test_is_subscribed = false;
+  assert_true( delete_message_requested_callback( TOPOLOGY_NAME, helper_respond_unsubscribe ) );
+
+  finalize_libtopology();
+
+  finalize_timer();
+  finalize_messenger();
+}
+
 //bool add_callback_switch_status_updated( void ( *callback )( void *user_data,
 //                                                             const topology_switch_status *switch_status ),
 //                                         void *user_data );
+static void
+handle_switch_status_updated_end( void *user_data, const topology_switch_status *switch_status ) {
+  check_expected( user_data );
+  check_expected( switch_status );
+
+  stop_event_handler();
+  stop_messenger();
+}
+static void
+handle_link_status_updated_end( void *user_data, const topology_link_status *link_status ) {
+  check_expected( user_data );
+  check_expected( link_status );
+
+  stop_event_handler();
+  stop_messenger();
+}
+static void
+handle_port_status_updated_end( void *user_data, const topology_port_status *port_status ) {
+  check_expected( user_data );
+  check_expected( port_status );
+
+  stop_event_handler();
+  stop_messenger();
+}
+
+static void
+test_add_callback_switch_status_updated() {
+  init_messenger( "/tmp" );
+  init_timer();
+
+  init_libtopology( TOPOLOGY_NAME );
+
+  void* user_data = (void*)0x1234;
+
+  const char* topology_client_name_base = TOPOLOGY_CLIENT_NAME_BASE;
+  char* topology_client_name = xcalloc( 1, strlen(topology_client_name_base) + (size_t)(ceil(log10(INT_MAX))) + 1 );
+  sprintf( topology_client_name, TOPOLOGY_CLIENT_NAME_BASE "%d", getpid() );
+
+  expect_value( handle_switch_status_updated_end, user_data, user_data );
+  expect_memory( handle_switch_status_updated_end, switch_status, &dummy_switch_status_up, sizeof(dummy_switch_status_up) );
+  assert_true( add_callback_switch_status_updated( handle_switch_status_updated_end, user_data ) );
+
+  // create dummy topology service sending event
+  buffer* buf = alloc_buffer_with_length( sizeof( topology_switch_status ) );
+  topology_switch_status* status = append_back_buffer( buf, sizeof( topology_switch_status ) );
+  memset( status, 0, sizeof( topology_switch_status ) );
+
+  status->dpid = htonll( dummy_switch_status_up.dpid );
+  status->status = dummy_switch_status_up.status;
+  assert_true( send_message( topology_client_name, TD_MSGTYPE_SWITCH_STATUS_NOTIFICATION,
+                buf->data, buf->length ) );
+  free_buffer( buf );
+
+  // start pump
+  start_messenger();
+  start_event_handler();
+
+  xfree( topology_client_name );
+
+  finalize_libtopology();
+
+  finalize_timer();
+  finalize_messenger();
+}
+
 //bool add_callback_link_status_updated( void ( *callback )( void *user_data,
 //                                                           const topology_link_status *link_status ),
 //                                       void *user_data );
+static void
+test_add_callback_link_status_updated() {
+  init_messenger( "/tmp" );
+  init_timer();
+
+  init_libtopology( TOPOLOGY_NAME );
+
+  void* user_data = (void*)0x1234;
+
+  const char* topology_client_name_base = TOPOLOGY_CLIENT_NAME_BASE;
+  char* topology_client_name = xcalloc( 1, strlen(topology_client_name_base) + (size_t)(ceil(log10(INT_MAX))) + 1 );
+  sprintf( topology_client_name, TOPOLOGY_CLIENT_NAME_BASE "%d", getpid() );
+
+  expect_value( handle_link_status_updated_end, user_data, user_data );
+  expect_memory( handle_link_status_updated_end, link_status, &dummy_link_status_up, sizeof(dummy_link_status_up) );
+  assert_true( add_callback_link_status_updated( handle_link_status_updated_end, user_data ) );
+
+  // create dummy topology service sending event
+  buffer* buf = alloc_buffer_with_length( sizeof( topology_link_status ) );
+  topology_link_status* status = append_back_buffer( buf, sizeof( topology_link_status ) );
+  memset( status, 0, sizeof( topology_link_status ) );
+
+  status->from_dpid = htonll( dummy_link_status_up.from_dpid );
+  status->from_portno = htons( dummy_link_status_up.from_portno );
+  status->to_dpid = htonll( dummy_link_status_up.to_dpid );
+  status->to_portno = htons( dummy_link_status_up.to_portno );
+  status->status = dummy_link_status_up.status;
+  assert_true( send_message( topology_client_name, TD_MSGTYPE_LINK_STATUS_NOTIFICATION,
+               buf->data, buf->length ) );
+  free_buffer( buf );
+
+  // start pump
+  start_messenger();
+  start_event_handler();
+
+  xfree( topology_client_name );
+
+  finalize_libtopology();
+
+  finalize_timer();
+  finalize_messenger();
+}
+
 //bool add_callback_port_status_updated( void ( *callback )( void *user_data,
 //                                                           const topology_port_status *port_status ),
 //                                       void *user_data );
+static void
+test_add_callback_port_status_updated() {
+  init_messenger( "/tmp" );
+  init_timer();
 
+  init_libtopology( TOPOLOGY_NAME );
+
+  void* user_data = (void*)0x1234;
+
+  const char* topology_client_name_base = TOPOLOGY_CLIENT_NAME_BASE;
+  char* topology_client_name = xcalloc( 1, strlen(topology_client_name_base) + (size_t)(ceil(log10(INT_MAX))) + 1 );
+  sprintf( topology_client_name, TOPOLOGY_CLIENT_NAME_BASE "%d", getpid() );
+
+  expect_value( handle_port_status_updated_end, user_data, user_data );
+  expect_memory( handle_port_status_updated_end, port_status, &dummy_port_status_up, sizeof(dummy_port_status_up) );
+  assert_true( add_callback_port_status_updated( handle_port_status_updated_end, user_data ) );
+
+  // create dummy topology service sending event
+  buffer* buf = alloc_buffer_with_length( sizeof( topology_port_status ) );
+  topology_port_status* status = append_back_buffer( buf, sizeof( topology_port_status ) );
+  memset( status, 0, sizeof( topology_port_status ) );
+
+  status->dpid = htonll( dummy_port_status_up.dpid );
+  status->port_no = htons( dummy_port_status_up.port_no );
+  memcpy( status->name, dummy_port_status_up.name, sizeof( dummy_port_status_up.name ) );
+  memcpy( status->mac, dummy_port_status_up.mac, sizeof( dummy_port_status_up.mac ) );
+  status->external = dummy_port_status_up.external;
+  status->status = dummy_port_status_up.status;
+  assert_true( send_message( topology_client_name, TD_MSGTYPE_PORT_STATUS_NOTIFICATION,
+               buf->data, buf->length ) );
+  free_buffer( buf );
+
+  // start pump
+  start_messenger();
+  start_event_handler();
+
+  xfree( topology_client_name );
+
+  finalize_libtopology();
+
+  finalize_timer();
+  finalize_messenger();
+}
 //bool get_all_link_status( void ( *callback )( void *user_data, size_t number,
 //                                              const topology_link_status *link_status ),
 //                          void *user_data );
@@ -493,11 +715,11 @@ helper_respond_1_link( const messenger_context_handle *handle, uint16_t tag,
   // zero clear including padding area to enable use of expect_memory checking
   memset( status, 0, sizeof( topology_link_status ) );
 
-  status->from_dpid = htonll( dummy_link_up.from_dpid );
-  status->from_portno = htons( dummy_link_up.from_portno );
-  status->to_dpid = htonll( dummy_link_up.to_dpid );
-  status->to_portno = htons( dummy_link_up.to_portno );
-  status->status = dummy_link_up.status;
+  status->from_dpid = htonll( dummy_link_status_up.from_dpid );
+  status->from_portno = htons( dummy_link_status_up.from_portno );
+  status->to_dpid = htonll( dummy_link_status_up.to_dpid );
+  status->to_portno = htons( dummy_link_status_up.to_portno );
+  status->status = dummy_link_status_up.status;
 
   send_reply_message( handle, TD_MSGTYPE_QUERY_LINK_STATUS_RESPONSE,
                       reply->data, reply->length );
@@ -521,7 +743,7 @@ test_get_all_link_status() {
   expect_value( callback_get_all_link_status_end, number, 1 );
 //  expect_check( callback_get_all_link_status_end, link_status, check_topology_link_status_equals, &dummy_link_up );
 //  expect_value( callback_get_all_link_status_end, link_status, &dummy_link_up );
-  expect_memory( callback_get_all_link_status_end, link_status, &dummy_link_up, sizeof(dummy_link_up) );
+  expect_memory( callback_get_all_link_status_end, link_status, &dummy_link_status_up, sizeof(dummy_link_status_up) );
   UNUSED( check_topology_link_status_equals );
 
   bool result = get_all_link_status( callback_get_all_link_status_end, user_data );
@@ -557,12 +779,12 @@ helper_respond_1_port( const messenger_context_handle *handle, uint16_t tag,
   // zero clear including padding area to enable use of expect_memory checking
   memset( status, 0, sizeof( topology_port_status ) );
 
-  status->dpid = htonll( dummy_port_up.dpid );
-  status->port_no = htons( dummy_port_up.port_no );
-  memcpy( status->name, dummy_port_up.name, sizeof( dummy_port_up.name ) );
-  memcpy( status->mac, dummy_port_up.mac, sizeof( dummy_port_up.mac ) );
-  status->external = dummy_port_up.external;
-  status->status = dummy_port_up.status;
+  status->dpid = htonll( dummy_port_status_up.dpid );
+  status->port_no = htons( dummy_port_status_up.port_no );
+  memcpy( status->name, dummy_port_status_up.name, sizeof( dummy_port_status_up.name ) );
+  memcpy( status->mac, dummy_port_status_up.mac, sizeof( dummy_port_status_up.mac ) );
+  status->external = dummy_port_status_up.external;
+  status->status = dummy_port_status_up.status;
 
   send_reply_message( handle, TD_MSGTYPE_QUERY_PORT_STATUS_RESPONSE,
                       reply->data, reply->length );
@@ -582,7 +804,7 @@ test_get_all_port_status() {
 
   expect_value( callback_get_all_port_status_end, user_data, user_data );
   expect_value( callback_get_all_port_status_end, number, 1 );
-  expect_memory( callback_get_all_port_status_end, port_status, &dummy_port_up, sizeof(dummy_port_up) );
+  expect_memory( callback_get_all_port_status_end, port_status, &dummy_port_status_up, sizeof(dummy_port_status_up) );
 
   bool result = get_all_port_status( callback_get_all_port_status_end, user_data );
   assert_true( result );
@@ -618,8 +840,8 @@ helper_respond_1_switch( const messenger_context_handle *handle, uint16_t tag,
   // zero clear including padding area to enable use of expect_memory checking
   memset( status, 0, sizeof( topology_switch_status ) );
 
-  status->dpid = htonll( dummy_switch_up.dpid );
-  status->status = dummy_switch_up.status;
+  status->dpid = htonll( dummy_switch_status_up.dpid );
+  status->status = dummy_switch_status_up.status;
 
   send_reply_message( handle, TD_MSGTYPE_QUERY_SWITCH_STATUS_RESPONSE,
                       reply->data, reply->length );
@@ -639,7 +861,7 @@ test_get_all_switch_status() {
 
   expect_value( callback_get_all_switch_status_end, user_data, user_data );
   expect_value( callback_get_all_switch_status_end, number, 1 );
-  expect_memory( callback_get_all_switch_status_end, switch_status, &dummy_switch_up, sizeof(dummy_switch_up) );
+  expect_memory( callback_get_all_switch_status_end, switch_status, &dummy_switch_status_up, sizeof(dummy_switch_status_up) );
 
   bool result = get_all_switch_status( callback_get_all_switch_status_end, user_data );
   assert_true( result );
@@ -771,13 +993,15 @@ main() {
     unit_test( test_duplicate_subscribe_topology ),
     unit_test_setup_teardown( test_unsubscribe_topology,
                               setup, teardown ),
+    unit_test( test_duplicate_unsubscribe_topology ),
     unit_test( test_get_all_link_status ),
     unit_test( test_get_all_port_status ),
     unit_test( test_get_all_switch_status ),
     unit_test( test_enable_topology_discovery ),
     unit_test( test_disable_topology_discovery ),
-//    unit_test_setup_teardown( test_duplicate_subscribe_topology,
-//                              setup, teardown ),
+    unit_test( test_add_callback_switch_status_updated ),
+    unit_test( test_add_callback_link_status_updated ),
+    unit_test( test_add_callback_port_status_updated ),
   };
   UNUSED( test_duplicate_subscribe_topology );
   UNUSED( original_die );
