@@ -972,6 +972,7 @@ tests = [
   "objects/unittests/message_queue_test",
   "objects/unittests/management_interface_test",
   "objects/unittests/management_service_interface_test",
+  "objects/unittests/libtopology_test",
 ]
 
 
