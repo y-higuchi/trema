@@ -68,7 +68,7 @@ reset_getopt() {
 }
 
 
-void
+static void
 option_parser( int *argc, char **argv[] ) {
   int c;
 
