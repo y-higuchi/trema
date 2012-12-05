@@ -467,10 +467,10 @@ topology_objects = [
   "probe_timer_table.o",
   "service_management.o",
   "subscriber_table.o",
-  "topology.o",
   "topology_option_parser.o",
   "topology_management.o",
-  "topology_table.o"
+  "topology_table.o",
+  "topology_main.o",
 ].collect do | each |
   File.join topology_objects_dir, each
 end
