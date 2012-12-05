@@ -959,12 +959,14 @@ tests = [
   "objects/unittests/ether_test",
   "objects/unittests/hash_table_test",
   "objects/unittests/heap_utility_test",
+  "objects/unittests/libtopology_test",
   "objects/unittests/linked_list_test",
   "objects/unittests/log_test",
   "objects/unittests/packetin_filter_interface_test",
   "objects/unittests/packet_info_test",
   "objects/unittests/packet_parser_test",
   "objects/unittests/persistent_storage_test",
+  "objects/unittests/topology_service_interface_option_parser_test",
   "objects/unittests/trema_private_test",
   "objects/unittests/utility_test",
   "objects/unittests/wrapper_test",
@@ -972,7 +974,6 @@ tests = [
   "objects/unittests/message_queue_test",
   "objects/unittests/management_interface_test",
   "objects/unittests/management_service_interface_test",
-  "objects/unittests/libtopology_test",
 ]
 
 
