@@ -979,6 +979,69 @@ test_disable_topology_discovery() {
   finalize_messenger();
 }
 
+
+static void
+helper_ping_reply_end( uint16_t tag, void *data, size_t len, void *user_data ) {
+  check_expected( tag );
+  check_expected( data );
+  check_expected( len );
+  check_expected( user_data );
+
+  stop_event_handler();
+  stop_messenger();
+}
+
+
+static void
+test_respond_to_ping_from_topology() {
+  init_messenger( "/tmp" );
+  init_timer();
+
+  init_libtopology( TOPOLOGY_NAME );
+
+  // receive ping reply from libtopology
+  assert_true( add_message_replied_callback( TOPOLOGY_NAME, helper_ping_reply_end ) );
+
+  void* user_data = (void*)0x1234;
+
+  const char* topology_client_name_base = TOPOLOGY_CLIENT_NAME_BASE;
+  char* topology_client_name = xcalloc( 1, strlen(topology_client_name_base) + (size_t)(ceil(log10(INT_MAX))) + 1 );
+  sprintf( topology_client_name, TOPOLOGY_CLIENT_NAME_BASE "%d", getpid() );
+
+  expect_value( helper_ping_reply_end, tag, TD_MSGTYPE_PING_RESPONSE );
+  // data == topology_ping_response.name
+  expect_string( helper_ping_reply_end, data, topology_client_name );
+  expect_value( helper_ping_reply_end, len, strlen(topology_client_name)+1 );
+  expect_value( helper_ping_reply_end, user_data, user_data );
+
+  // create dummy topology service sending ping event
+  buffer* buf = alloc_buffer_with_length( sizeof( topology_request ) + strlen(topology_client_name)+1  );
+  topology_request* status = append_back_buffer( buf, sizeof( topology_request ) + strlen(topology_client_name)+1 );
+  memset( status, 0, sizeof( topology_request ) );
+
+  strcpy( status->name, topology_client_name);
+
+  assert_true( send_request_message( topology_client_name, TOPOLOGY_NAME,TD_MSGTYPE_PING_REQUEST,
+               buf->data, buf->length, user_data ) );
+  free_buffer( buf );
+
+
+
+  // start pump
+  start_messenger();
+  start_event_handler();
+
+  assert_true( delete_message_replied_callback( TOPOLOGY_NAME, helper_ping_reply_end ) );
+
+
+  xfree( topology_client_name );
+
+  finalize_libtopology();
+
+  finalize_timer();
+  finalize_messenger();
+}
+
 /********************************************************************************
  * Run tests.
  ********************************************************************************/
@@ -1002,6 +1065,7 @@ main() {
     unit_test( test_add_callback_switch_status_updated ),
     unit_test( test_add_callback_link_status_updated ),
     unit_test( test_add_callback_port_status_updated ),
+    unit_test( test_respond_to_ping_from_topology ),
   };
   UNUSED( test_duplicate_subscribe_topology );
   UNUSED( original_die );
