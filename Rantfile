@@ -518,7 +518,6 @@ topology_examples_binaries = {
   "show_switch_status" => show_switch_status_objects,
 }
 
-desc "Build topology examples."
 topology_examples_binaries.each_pair do | bin, objs |
   target = File.join( topology_examples_objects_dir, bin )
   task "examples:topology:#{bin}" => target
@@ -528,6 +527,7 @@ topology_examples_binaries.each_pair do | bin, objs |
 end
 
 
+desc "Build topology examples."
 task "examples:topology" => topology_examples_binaries.keys.map {|e| "examples:topology:#{e}" }
 
 
