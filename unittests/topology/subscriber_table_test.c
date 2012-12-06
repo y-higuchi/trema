@@ -74,6 +74,24 @@ test_insert_subscriber_entry_and_lookup_and_then_delete() {
 }
 
 //double insert
+static void
+test_double_insert_subscriber_entry_fails() {
+  assert_true( insert_subscriber_entry("subscriber1") );
+  assert_false( insert_subscriber_entry("subscriber1") );
+
+  subscriber_entry* e = lookup_subscriber_entry("subscriber1");
+  assert_true( e != NULL );
+  assert_string_equal( e->name, "subscriber1" );
+
+  delete_subscriber_entry( e );
+}
+
+// lookup fail
+static void
+test_lookup_subscriber_entry_not_found_returns_NULL() {
+  subscriber_entry* e = lookup_subscriber_entry("subscriber1");
+  assert_true( e == NULL );
+}
 
 //void foreach_subscriber( void function( subscriber_entry *entry, void *user_data ), void *user_data );
 static void
@@ -113,6 +131,8 @@ main() {
   const UnitTest tests[] = {
       unit_test( test_init_and_finalize_subscriber_table ),
       unit_test_setup_teardown( test_insert_subscriber_entry_and_lookup_and_then_delete, setup, teardown ),
+      unit_test_setup_teardown( test_double_insert_subscriber_entry_fails, setup, teardown ),
+      unit_test_setup_teardown( test_lookup_subscriber_entry_not_found_returns_NULL, setup, teardown ),
       unit_test_setup_teardown( test_foreach_subscriber, setup, teardown ),
   };
   setup_leak_detector();
