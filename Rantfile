@@ -461,7 +461,7 @@ gen DirectedRule, topology_objects_dir => [ "src/topology" ], :o => :c do | t |
   sys "gcc -I#{ Trema.include } -I#{ Trema.openflow } #{ var :CFLAGS } -c -o #{ t.name } #{ t.source }"
 end
 
-topology_objects = [
+topology_objects_base = [
   "discovery_management.o",
   "lldp.o",
   "probe_timer_table.o",
@@ -471,7 +471,9 @@ topology_objects = [
   "topology_management.o",
   "topology_table.o",
   "topology_main.o",
-].collect do | each |
+]
+
+topology_objects = topology_objects_base.collect do | each |
   File.join topology_objects_dir, each
 end
 
@@ -481,6 +483,48 @@ file Trema::Executables.topology => topology_objects + [ libtrema ] do | t |
   sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
 end
 
+################################################################################
+# topology unittests
+################################################################################
+
+gen Directory, "#{ Trema.home }/objects/unittests"
+
+gen DirectedRule, "#{ Trema.home }/objects/unittests" => [ "src/topology" ], :o => :c do | t |
+  sys "gcc --coverage -I#{ Trema.include } -I#{ Trema.openflow } #{ var :CFLAGS } -c -o #{ t.name } #{ t.source }"
+end
+
+topology_gcov_objects = topology_objects_base.collect do | each |
+  File.join "#{ Trema.home }/objects/unittests", each
+end
+
+desc "Build topology. (coverage)"
+task "coverage:topology" => "#{ Trema.home }/objects/unittests/topology"
+file "#{ Trema.home }/objects/unittests/topology" => topology_gcov_objects + [ libtrema ] do | t |
+  sys "gcc --coverage -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
+end
+
+topology_gcov_objects_wo_main = topology_objects_base.reject {|e| e == "topology_main.o" }.collect do | each |
+  File.join "#{ Trema.home }/objects/unittests", each
+end
+
+gen DirectedRule, "#{ Trema.home }/objects/unittests" => [ "unittests/topology" ], :o => :c do | t |
+  sys "gcc --coverage -c #{ t.source } -o #{ t.name } #{ var :CFLAGS } -I#{ Trema.include } -I#{ Trema.openflow } -I#{ File.dirname Trema.cmockery_h } -Iunittests -Isrc/topology"
+end
+
+topology_unittests = [
+  "objects/unittests/subscriber_table_test",
+]
+
+topology_unittests.each do |each|
+  task :build_unittests => [ "coverage:libtrema", each ]
+  task each => [ "coverage:libtrema", "vendor:cmockery", "objects/unittests/cmockery_trema.o", "#{ Trema.home }/objects/unittests", "#{ Trema.home }/objects/unittests/#{ File.basename each }.o" ] + topology_gcov_objects_wo_main
+  file each => [ "#{ Trema.home }/objects/unittests/#{ File.basename each }.o" ] + topology_gcov_objects_wo_main do | t |
+    sys "gcc --coverage -o #{ t.name } #{ each }.o #{ topology_gcov_objects_wo_main.join(' ') } objects/unittests/cmockery_trema.o -Lobjects/unittests -L#{ File.dirname Trema.libcmockery_a } -ltrema -lrt -lcmockery -lsqlite3 -ldl -lpthread --static"
+  end
+end
+
+task :build_unittests => [ "coverage:libtrema" ] + topology_unittests
+  
 ################################################################################
 # Build topology examples
 ################################################################################
@@ -992,10 +1036,12 @@ tests.each do | each |
   end
 end
 
+external_unittests = [
+] + topology_unittests
 
 desc "Run unittests"
 task :unittests => [ :build_old_unittests, :build_unittests ] do
-  ( sys[ "unittests/objects/*_test" ] + tests ).each do | each |
+  ( sys[ "unittests/objects/*_test" ] + tests + external_unittests ).each do | each |
     puts "Running #{ each }..."
     sys each
   end
