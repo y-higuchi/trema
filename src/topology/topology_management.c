@@ -204,7 +204,7 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
     warn( "Received port-status, but switch(%#" PRIx64 ") is not found.", datapath_id );
     return;
   }
-  port_entry *port = lookup_port_entry( sw, phy_port.port_no, phy_port.name );
+  port_entry *port = lookup_port_entry_by_port( sw, phy_port.port_no );
 
 
   switch ( reason ) {
@@ -229,6 +229,10 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
       break;
 
     case OFPPR_MODIFY:
+      if ( port == NULL ) {
+        debug( "Modified port not found by port_no. (%u)", phy_port.port_no );
+        port = lookup_port_entry_by_name( sw, phy_port.name );
+      }
       if ( port == NULL ) {
         warn( "Failed to modify port(%u, `%s'), switch(%#" PRIx64 ").",
               phy_port.port_no, phy_port.name, datapath_id );

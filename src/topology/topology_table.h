@@ -62,7 +62,8 @@ void foreach_sw_entry( void function( sw_entry *entry, void *user_data ), void *
 
 port_entry *update_port_entry( sw_entry *sw, uint16_t port_no, const char *name );
 void delete_port_entry( sw_entry *sw, port_entry *port );
-port_entry *lookup_port_entry( sw_entry *sw, uint16_t port_no, const char *name );
+port_entry *lookup_port_entry_by_port( sw_entry *sw, uint16_t port_no );
+port_entry *lookup_port_entry_by_name( sw_entry *sw, const char *name );
 void foreach_port_entry( void function( port_entry *entry, void *user_data ), void *user_data );
 
 link_to *update_link_to( port_entry *port, uint64_t *datapath_id, uint16_t port_no, bool up );

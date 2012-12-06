@@ -361,7 +361,7 @@ set_discovered_link_status( topology_update_link_status *link_status ) {
     info( "Not found datapath_id %#" PRIx64, link_status->from_dpid );
     return TD_RESPONSE_INVALID;
   }
-  port_entry *port = lookup_port_entry( sw, link_status->from_portno, NULL );
+  port_entry *port = lookup_port_entry_by_port( sw, link_status->from_portno );
   if ( port == NULL ) {
     info( "Not found port no %u. datapath_id %#" PRIx64, link_status->from_portno,
           link_status->from_dpid );
