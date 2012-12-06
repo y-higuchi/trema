@@ -197,7 +197,6 @@ update_sw_entry( uint64_t *datapath_id ) {
 void
 delete_sw_entry( sw_entry *sw ) {
   assert( sw->port_table == NULL );
-  assert( sw->up == false );
   delete_element( &sw_table, sw );
   free_sw_entry( sw );
 }
