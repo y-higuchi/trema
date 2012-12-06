@@ -82,9 +82,12 @@ port_entry *
 update_port_entry( sw_entry *sw, uint16_t port_no, const char *name ) {
   port_entry *entry;
 
-  entry = lookup_port_entry( sw, port_no, name );
+  entry = lookup_port_entry_by_port( sw, port_no );
   if ( entry != NULL ) {
-      return entry;
+    if ( name != NULL && strcmp( entry->name, name ) != 0 ) {
+      strncpy( entry->name, name, sizeof( entry->name ) );
+    }
+    return entry;
   }
   entry = allocate_port_entry( sw, port_no, name );
   insert_in_front( &( sw->port_table ), entry );
@@ -102,27 +105,31 @@ delete_port_entry( sw_entry *sw, port_entry *port ) {
 
 
 port_entry *
-lookup_port_entry( sw_entry *sw, uint16_t port_no, const char *name ) {
-  port_entry *store = NULL, *entry;
+lookup_port_entry_by_port( sw_entry *sw, uint16_t port_no ) {
+  port_entry *entry;
   list_element *list;
-
   for ( list = sw->port_table; list != NULL; list = list->next ) {
     entry = list->data;
-    if ( name == NULL ) {
-      if ( entry->port_no == port_no ) {
-        return entry;
-      }
-    } else {
-      if ( strcmp( entry->name, name ) == 0 ) {
-        return entry;
-      }
-      if ( entry->port_no == port_no ) {
-        store = entry;
-      }
+    if( entry->port_no == port_no ) {
+      return entry;
     }
   }
-  if ( store != NULL ) {
-    return store;
+
+  return NULL;
+}
+
+
+port_entry *
+lookup_port_entry_by_name( sw_entry *sw, const char *name ) {
+  if ( name == NULL ) return NULL;
+
+  port_entry *entry;
+  list_element *list;
+  for ( list = sw->port_table; list != NULL; list = list->next ) {
+    entry = list->data;
+    if( strcmp( entry->name, name ) == 0 ) {
+      return entry;
+    }
   }
 
   return NULL;
