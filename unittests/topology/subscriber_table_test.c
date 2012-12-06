@@ -83,6 +83,11 @@ helper_subscriber_walker( subscriber_entry* entry, void* user ) {
   check_expected( user );
 }
 static void
+helper_delete_subscriber( subscriber_entry* entry, void* user ) {
+  UNUSED( user );
+  delete_subscriber_entry( entry );
+}
+static void
 test_foreach_subscriber() {
   assert_true( insert_subscriber_entry("subscriber1") );
   assert_true( insert_subscriber_entry("subscriber2") );
@@ -93,15 +98,10 @@ test_foreach_subscriber() {
   void* user = (void*)0x1234;
 
   expect_value_count( helper_subscriber_walker, user, user, 5 );
-  expect_string( helper_subscriber_walker, name, "" );
-
+  expect_memory_count( helper_subscriber_walker, name, "subscriber", strlen("subscriber"), 5 );
   foreach_subscriber( helper_subscriber_walker, user );
 
-  assert_true( delete_subscriber_entry("subscriber1") );
-  assert_true( delete_subscriber_entry("subscriber2") );
-  assert_true( delete_subscriber_entry("subscriber3") );
-  assert_true( delete_subscriber_entry("subscriber4") );
-  assert_true( delete_subscriber_entry("subscriber5") );
+  foreach_subscriber( helper_delete_subscriber, NULL );
 }
 
 /********************************************************************************
