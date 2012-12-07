@@ -55,9 +55,9 @@ typedef struct sw_entry {
 void init_topology_table( void );
 void finalize_topology_table( void );
 
-sw_entry *update_sw_entry( uint64_t *datapath_id );
+sw_entry *update_sw_entry( const uint64_t *datapath_id );
 void delete_sw_entry( sw_entry *sw );
-sw_entry *lookup_sw_entry( uint64_t *datapath_id );
+sw_entry *lookup_sw_entry( const uint64_t *datapath_id );
 void foreach_sw_entry( void function( sw_entry *entry, void *user_data ), void *user_data );
 
 port_entry *update_port_entry( sw_entry *sw, uint16_t port_no, const char *name );
@@ -66,7 +66,7 @@ port_entry *lookup_port_entry_by_port( sw_entry *sw, uint16_t port_no );
 port_entry *lookup_port_entry_by_name( sw_entry *sw, const char *name );
 void foreach_port_entry( void function( port_entry *entry, void *user_data ), void *user_data );
 
-link_to *update_link_to( port_entry *port, uint64_t *datapath_id, uint16_t port_no, bool up );
+link_to *update_link_to( port_entry *port, const uint64_t *datapath_id, uint16_t port_no, bool up );
 void delete_link_to( port_entry *port );
 
 

@@ -27,7 +27,7 @@ static list_element *sw_table;
 
 
 link_to *
-update_link_to( port_entry *port, uint64_t *datapath_id, uint16_t port_no, bool up ) {
+update_link_to( port_entry *port, const uint64_t *datapath_id, uint16_t port_no, bool up ) {
   if ( port->link_to != NULL ) {
     xfree( port->link_to );
     port->link_to = NULL;
@@ -161,7 +161,7 @@ foreach_port_entry( void function( port_entry *entry, void *user_data ),
 
 
 static sw_entry *
-allocate_sw_entry( uint64_t *datapath_id ) {
+allocate_sw_entry( const uint64_t *datapath_id ) {
   sw_entry *new_entry;
 
   new_entry = xmalloc( sizeof( sw_entry ) );
@@ -187,7 +187,7 @@ free_sw_entry( sw_entry *sw ) {
 
 
 sw_entry *
-update_sw_entry( uint64_t *datapath_id ) {
+update_sw_entry( const uint64_t *datapath_id ) {
   sw_entry *entry;
 
   entry = lookup_sw_entry( datapath_id );
@@ -210,7 +210,7 @@ delete_sw_entry( sw_entry *sw ) {
 
 
 sw_entry *
-lookup_sw_entry( uint64_t *datapath_id ) {
+lookup_sw_entry( const uint64_t *datapath_id ) {
   sw_entry *entry;
   list_element *list;
 
