@@ -513,6 +513,7 @@ end
 
 topology_unittests = [
   "objects/unittests/subscriber_table_test",
+  "objects/unittests/topology_table_test",
 ]
 
 topology_unittests.each do |each|
