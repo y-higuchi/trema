@@ -165,7 +165,6 @@ reset_confirmed_state( probe_timer_entry *entry ) {
 
 void
 probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t port_no ) {
-debug( "!!!!%s!!!!", __func__ );
   int old_state = entry->state;
   switch ( entry->state ) {
     case PROBE_TIMER_STATE_INACTIVE:
@@ -292,7 +291,7 @@ debug( "!!!!%s!!!!", __func__ );
             info( "Link unstable (%#" PRIx64 ":%u)->(%#" PRIx64 ":%u)", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
             uint8_t result = set_discovered_link_status( &link_status );
             if ( result != TD_RESPONSE_OK ) {
-              // TODO: Is state transition of set link statsu error case OK?
+              // TODO: Is state transition of set link status error case OK?
               warn( "Failed to set (%#" PRIx64 ",%d)->(%#" PRIx64 ",%d) status to TD_LINK_UNSTABLE.", link_status.from_dpid, link_status.from_portno, link_status.to_dpid, link_status.to_portno );
             }
           }
@@ -351,6 +350,12 @@ set_interval_timer( void ) {
 
 
 static void
+remove_interval_timer( void ) {
+  delete_timer_event( interval_timer_event, NULL );
+  debug( "remove interval timer" );
+}
+
+static void
 interval_timer_event( void *user_data ) {
   UNUSED( user_data );
 
@@ -394,6 +399,8 @@ finalize_probe_timer_table( void ) {
   delete_dlist( probe_timer_table );
   probe_timer_table = NULL;
   probe_timer_last = NULL;
+
+  remove_interval_timer();
 }
 
 
