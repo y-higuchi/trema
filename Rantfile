@@ -514,6 +514,7 @@ topology_unittests = [
   "objects/unittests/subscriber_table_test",
   "objects/unittests/topology_table_test",
   "objects/unittests/topology_option_parser_test",
+  "objects/unittests/probe_timer_table_test",
 ]
 
 topology_unittests.each do |each|
