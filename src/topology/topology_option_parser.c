@@ -12,9 +12,11 @@
 #include <getopt.h>
 #include <netinet/ether.h>
 
-static char short_options[] = "am:io:r:";
+static char short_options[] = "w:e:am:io:r:";
 
 static struct option long_options[] = {
+  { "liveness_wait", required_argument, NULL, 'w'},
+  { "liveness_limit", required_argument, NULL, 'e'},
   { "always_run_discovery", no_argument, NULL, 'a'},
   { "lldp_mac_dst", required_argument, NULL, 'm' },
   { "lldp_over_ip", no_argument, NULL, 'i' },
@@ -31,6 +33,8 @@ usage() {
     "topology manager\n"
     "Usage: %s [OPTION]...\n"
     "\n"
+    "  -w, --liveness_wait=SEC         subscriber liveness check interval\n"
+    "  -e, --liveness_limit=COUNT      set liveness check error threshold\n"
     "  -a, --always_run_discovery      discovery will always be enabled\n"
     "  -m, --lldp_mac_dst=MAC_ADDR     destination Mac address for sending LLDP\n"
     "  -i, --lldp_over_ip              send LLDP messages over IP\n"
@@ -102,7 +106,6 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
   }
 
 
-  // TODO make ping interval configurable from argument
   options->service.ping_interval_sec = 60;
   options->service.ping_ageout_cycles = 5;
 
@@ -115,9 +118,37 @@ parse_options( topology_options *options, int *argc, char **argv[] ) {
   int c;
   while ( ( c = getopt_long( *argc, *argv, short_options, long_options, NULL ) ) != -1 ) {
     switch ( c ) {
+      case 'w':
+      {
+        int sec = atoi( optarg );
+        if( sec <= 0 ) {
+          error( "Invalid liveness wait interval." );
+          usage();
+          exit( EXIT_FAILURE );
+          return;
+        }
+        options->service.ping_interval_sec = sec;
+        info( "Liveness check interval is set to %d seconds.", sec );
+        break;
+      }
+
+      case 'e':
+      {
+        int sec = atoi( optarg );
+        if( sec <= 0 ) {
+          error( "Invalid liveness check error count." );
+          usage();
+          exit( EXIT_FAILURE );
+          return;
+        }
+        options->service.ping_ageout_cycles = sec;
+        info( "Liveness check error threshold is set to %d.", sec );
+        break;
+      }
+
       case 'a':
         options->discovery.always_enabled = true;
-        info( "Discovery will always be neabled." );
+        info( "Discovery will always be enabled." );
         break;
 
       case 'm':
