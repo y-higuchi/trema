@@ -511,6 +511,7 @@ gen DirectedRule, "#{ Trema.home }/objects/unittests" => [ "unittests/topology" 
 end
 
 topology_unittests = [
+  "objects/unittests/lldp_test",
   "objects/unittests/subscriber_table_test",
   "objects/unittests/topology_table_test",
   "objects/unittests/topology_option_parser_test",
