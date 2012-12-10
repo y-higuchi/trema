@@ -209,16 +209,11 @@ setup_fake_subscriber() {
   assert_true( init_service_management( options ) );
 
   insert_subscriber_entry( TEST_SUBSCRIBER_NAME );
-
-
 }
 
 
 static void
 teardown_fake_subscriber() {
-
-
-
   subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( e != NULL );
   delete_subscriber_entry( e );
@@ -267,7 +262,6 @@ test_init_start_stop_finalize_service_management() {
 
   stop_service_management();
   finalize_service_management();
-
 }
 
 //void notify_switch_status_for_all_user( sw_entry *sw );
@@ -296,7 +290,6 @@ test_notify_switch_status_for_all_user() {
 
   finalize_timer();
   finalize_messenger();
-
 }
 
 
@@ -424,7 +417,6 @@ local_link_status_updated_handler( void *user_data, const port_entry *port ) {
 
   const bool link_up = port->link_to->up;
   check_expected( link_up );
-
 }
 
 static void
@@ -538,20 +530,12 @@ test_set_switch_status_updated_hook() {
   sw.datapath_id = 0x1234;
   sw.up = true;
 
-
-
-
-
-
   assert_true( set_switch_status_updated_hook( local_switch_status_updated_handler, NULL ) );
 
   expect_value( local_switch_status_updated_handler, user_data, NULL );
   expect_value( local_switch_status_updated_handler, datapath_id, 0x1234 );
   expect_value( local_switch_status_updated_handler, up, true );
   notify_switch_status_for_all_user( &sw );
-
-
-
 }
 
 //uint8_t set_discovered_link_status( topology_update_link_status* link_status );
