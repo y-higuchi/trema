@@ -228,8 +228,8 @@ static const topology_response dummy_response_no_such_subscriber = {
 
 static int
 check_topology_link_status_equals( const LargestIntegralType val, const LargestIntegralType check_val ) {
-  const topology_link_status* target = (const topology_link_status*)val;
-  const topology_link_status* reference = (const topology_link_status*)check_val;
+  const topology_link_status* target = (const topology_link_status*)(intptr_t)val;
+  const topology_link_status* reference = (const topology_link_status*)(intptr_t)check_val;
 
   if( !(target->from_dpid == reference->from_dpid) ) {
     print_error(".from_dpid:'%#" PRIx64 "' != '%#" PRIx64 "'\n", target->from_dpid, reference->from_dpid);
