@@ -610,6 +610,7 @@ ping_subscriber( subscriber_entry *entry, void *user_data ) {
   if ( !success ) {
     warn( "Failed to send ping to '%s'", entry->name );
   }
+  free_buffer( ping );
 
   // ping age out
   const time_t current = time( NULL );
@@ -652,6 +653,9 @@ start_service_management( void ) {
 
 
 void stop_service_management( void ) {
+  delete_timer_event( ping_all_subscriber, NULL );
+  delete_message_replied_callback( get_trema_name(), recv_reply );
+  delete_message_requested_callback( get_trema_name(), recv_request );
 }
 
 
