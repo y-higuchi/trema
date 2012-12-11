@@ -226,7 +226,7 @@ recv_query_switch_status_reply( uint16_t tag,
                                 void *data, size_t len, void *param0 ) {
   UNUSED( tag );
   topology_switch_status *const switch_status = data;
-  const int number_of_ports = ( int ) ( len / sizeof( topology_switch_status ) );
+  const int number_of_switches = ( int ) ( len / sizeof( topology_switch_status ) );
   int i;
   struct send_request_param *param = param0;
 
@@ -234,13 +234,13 @@ recv_query_switch_status_reply( uint16_t tag,
     debug( "%s: callback is NULL", __FUNCTION__ );
   } else {
     // rearrange byte order
-    for ( i = 0; i < number_of_ports; i++ ) {
+    for ( i = 0; i < number_of_switches; i++ ) {
       topology_switch_status *s = &switch_status[ i ];
       s->dpid = ntohll( s->dpid );
     }
 
     // rebuild link topology
-    ( *param->callback )( param->user_data, number_of_ports, switch_status );
+    ( *param->callback )( param->user_data, number_of_switches, switch_status );
   }
   xfree( param );
 }
