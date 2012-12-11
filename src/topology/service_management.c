@@ -621,7 +621,7 @@ ping_subscriber( subscriber_entry *entry, void *user_data ) {
 }
 
 void
-ping_all_subscriber( void* user_data) {
+ping_all_subscriber( void* user_data ) {
   debug( "Sending ping to each subscribers" );
   foreach_subscriber( ping_subscriber, user_data );
 }
