@@ -6,6 +6,7 @@
  */
 
 #include <assert.h>
+#include <unistd.h>
 
 #include "checks.h"
 #include "cmockery_trema.h"
@@ -22,9 +23,15 @@
 #define TEST_TREMA_NAME "test_service_mgmt"
 #define TEST_SUBSCRIBER_NAME "test_topo-client-12345"
 
+#define TEST_CONTROL_NAME "test_service_mgmt-control"
+
 // defined in trema.c
 extern void set_trema_name( const char *name );
 extern void _free_trema_name();
+
+
+// defined in service_management.c
+extern void ping_all_subscriber(void* user_data );
 
 /********************************************************************************
  * Mock functions.
@@ -174,39 +181,155 @@ callback_fake_libtopology_client_notification_end( uint16_t tag, void *data, siz
   stop_messenger();
 }
 
+#define TEST_END_REQUEST 0
+#define TEST_AFTER_PING_REPLY 1
+static void testhelper_ping_subscriber();
+
+static void
+callback_test_control_notification_handler( uint16_t tag, void *data, size_t len ) {
+  UNUSED( data );
+  UNUSED( len );
+  switch( tag ){
+  case TEST_END_REQUEST:
+    stop_event_handler();
+    stop_messenger();
+    break;
+
+  case TEST_AFTER_PING_REPLY:
+    testhelper_ping_subscriber();
+    break;
+  }
+}
+
+static void
+mock_ping_request( const messenger_context_handle *handle, void *data, size_t len ) {
+
+  assert_true( len > 0 );
+  topology_request *req = data;
+  const char* name = req->name;
+  check_expected( name );
+
+
+  // respond to topology ping
+  const size_t name_bytes = strlen( name ) + 1;
+  const size_t req_len = sizeof(topology_ping_response) + name_bytes;
+
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_ping_response *res = append_back_buffer( buf, req_len );
+  strncpy( res->name, name, name_bytes );
+
+  bool ret = send_reply_message( handle, TD_MSGTYPE_PING_RESPONSE,
+                      buf->data, buf->length );
+  assert_true( ret );
+  free_buffer( buf );
+
+
+  flush_messenger();
+  // below is purely for testing purpose.
+  send_message( TEST_CONTROL_NAME, TEST_AFTER_PING_REPLY, NULL, 0 );
+}
+
+static void
+callback_fake_libtopology_client_request( const messenger_context_handle *handle,
+                                          uint16_t tag, void *data, size_t len ) {
+  switch ( tag ) {
+  case TD_MSGTYPE_PING_REQUEST:
+    // ping: topology service -> libtopology
+    mock_ping_request( handle, data, len );
+    break;
+
+  default:
+    // not reachable
+    assert_int_equal(tag, NULL);
+    break;
+  }
+}
+
+static void
+mock_topology_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
+  UNUSED( tag );
+  UNUSED( len );
+  UNUSED( user_data );
+  topology_response *res = data;
+
+  uint8_t status = res->status;
+  check_expected( status );
+
+}
+
+static void
+callback_fake_libtopology_client_reply_end( uint16_t tag, void *data, size_t len, void *user_data ) {
+  switch ( tag ) {
+  case TD_MSGTYPE_SUBSCRIBE_RESPONSE:
+  case TD_MSGTYPE_UNSUBSCRIBE_RESPONSE:
+  case TD_MSGTYPE_ENABLE_DISCOVERY_RESPONSE:
+  case TD_MSGTYPE_DISABLE_DISCOVERY_RESPONSE:
+    mock_topology_reply( tag, data, len, user_data );
+    break;
+
+  default:
+    // not reachable
+    assert_int_equal(tag, NULL);
+    break;
+  }
+  stop_event_handler();
+  stop_messenger();
+}
+
+
+static void
+mock_execute_timer_events( int *next_timeout_usec ) {
+  UNUSED( next_timeout_usec );
+  // Do nothing.
+}
+
 
 /********************************************************************************
  * Setup and teardown functions.
  ********************************************************************************/
 
 static void
-setup() {
+setup_fake_messenger() {
   set_trema_name( TEST_TREMA_NAME );
 
   swap_original( add_message_requested_callback );
   swap_original( add_message_replied_callback );
 
   swap_original( add_periodic_event_callback );
-
 }
 
 static void
-teardown() {
-  revert_original( add_message_requested_callback );
-  revert_original( add_message_replied_callback );
-
+teardown_fake_messenger() {
   revert_original( add_periodic_event_callback );
+
+  revert_original( add_message_replied_callback );
+  revert_original( add_message_requested_callback );
+
+  _free_trema_name();
+}
+
+static void
+setup_service_management() {
+  set_trema_name( TEST_TREMA_NAME );
+
+  service_management_options options = {
+      .ping_interval_sec = 60,
+      .ping_ageout_cycles = 5,
+  };
+  assert_true( init_service_management( options ) );
+}
+
+
+static void
+teardown_service_management() {
+  finalize_service_management();
 
   _free_trema_name();
 }
 
 static void
 setup_fake_subscriber() {
-  service_management_options options = {
-      .ping_interval_sec = 60,
-      .ping_ageout_cycles = 5,
-  };
-  assert_true( init_service_management( options ) );
+  setup_service_management();
 
   insert_subscriber_entry( TEST_SUBSCRIBER_NAME );
 }
@@ -217,7 +340,8 @@ teardown_fake_subscriber() {
   subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( e != NULL );
   delete_subscriber_entry( e );
-  finalize_service_management();
+
+  teardown_service_management();
 }
 
 /********************************************************************************
@@ -540,6 +664,352 @@ test_set_switch_status_updated_hook() {
 
 //uint8_t set_discovered_link_status( topology_update_link_status* link_status );
 
+
+
+static time_t g_last_seen;
+
+static void
+testhelper_ping_subscriber() {
+  // test subscriber
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+
+  assert_true( e->last_seen > g_last_seen );
+
+  stop_event_handler();
+  stop_messenger();
+}
+
+static void
+test_ping_subscriber() {
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_requested_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_request ) );
+  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+  g_last_seen = e->last_seen;
+  // sleep 1 sec to assure time stamp to change.
+  sleep(1);
+
+
+  start_service_management();
+
+  ping_all_subscriber( NULL );
+
+  expect_string( mock_ping_request, name, TEST_SUBSCRIBER_NAME);
+
+  start_event_handler();
+  start_messenger();
+
+  stop_service_management();
+
+  assert_true( delete_message_requested_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_request ) );
+  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
+
+static void
+test_subscribe_from_client() {
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  start_service_management();
+
+  // send subscribe request
+  const size_t req_len = strlen( TEST_SUBSCRIBER_NAME ) + 1;
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_request *req = append_back_buffer( buf, req_len );
+  strcpy( req->name, TEST_SUBSCRIBER_NAME );
+  send_request_message( TEST_TREMA_NAME, TEST_SUBSCRIBER_NAME, TD_MSGTYPE_SUBSCRIBE_REQUEST,
+                        buf->data, buf->length, NULL );
+  free_buffer( buf );
+
+  expect_value( mock_topology_reply, status, TD_RESPONSE_OK );
+
+  start_event_handler();
+  start_messenger();
+
+  // check subscriber table
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+  assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
+
+  delete_subscriber_entry( e );
+
+  stop_service_management();
+
+  assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
+static void
+test_duplicate_subscribe_from_client() {
+  // note: setup/teardown differ from test_subscribe_from_client()
+
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  start_service_management();
+
+  // send subscribe request
+  const size_t req_len = strlen( TEST_SUBSCRIBER_NAME ) + 1;
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_request *req = append_back_buffer( buf, req_len );
+  strcpy( req->name, TEST_SUBSCRIBER_NAME );
+  send_request_message( TEST_TREMA_NAME, TEST_SUBSCRIBER_NAME, TD_MSGTYPE_SUBSCRIBE_REQUEST,
+                        buf->data, buf->length, NULL );
+  free_buffer( buf );
+
+  expect_value( mock_topology_reply, status, TD_RESPONSE_ALREADY_SUBSCRIBED );
+
+  start_event_handler();
+  start_messenger();
+
+  // check subscriber table
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+  assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
+
+  stop_service_management();
+
+  assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
+static void
+test_unsubscribe_from_client() {
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  start_service_management();
+
+  // check subscriber table
+  assert_true( insert_subscriber_entry( TEST_SUBSCRIBER_NAME ) );
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+  assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
+
+  // send subscribe request
+  const size_t req_len = strlen( TEST_SUBSCRIBER_NAME ) + 1;
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_request *req = append_back_buffer( buf, req_len );
+  strcpy( req->name, TEST_SUBSCRIBER_NAME );
+  send_request_message( TEST_TREMA_NAME, TEST_SUBSCRIBER_NAME, TD_MSGTYPE_UNSUBSCRIBE_REQUEST,
+                        buf->data, buf->length, NULL );
+  free_buffer( buf );
+
+  expect_value( mock_topology_reply, status, TD_RESPONSE_OK );
+
+  start_event_handler();
+  start_messenger();
+
+
+  // check subscriber table
+  subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( ea == NULL );
+
+  stop_service_management();
+
+  assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
+static void
+test_duplicate_unsubscribe_from_client() {
+  // note: setup/teardown differ from test_subscribe_from_client()
+
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  start_service_management();
+
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e == NULL );
+
+  // send subscribe request
+  const size_t req_len = strlen( TEST_SUBSCRIBER_NAME ) + 1;
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_request *req = append_back_buffer( buf, req_len );
+  strcpy( req->name, TEST_SUBSCRIBER_NAME );
+  send_request_message( TEST_TREMA_NAME, TEST_SUBSCRIBER_NAME, TD_MSGTYPE_UNSUBSCRIBE_REQUEST,
+                        buf->data, buf->length, NULL );
+  free_buffer( buf );
+
+  expect_value( mock_topology_reply, status, TD_RESPONSE_NO_SUCH_SUBSCRIBER );
+
+  start_event_handler();
+  start_messenger();
+
+  // check subscriber table
+  subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( ea == NULL );
+
+  stop_service_management();
+
+  assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
+static void
+test_enable_discovery_from_client() {
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  start_service_management();
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+  assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
+  e->use_discovery = false;
+
+  // send subscribe request
+  const size_t req_len = strlen( TEST_SUBSCRIBER_NAME ) + 1;
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_request *req = append_back_buffer( buf, req_len );
+  strcpy( req->name, TEST_SUBSCRIBER_NAME );
+  send_request_message( TEST_TREMA_NAME, TEST_SUBSCRIBER_NAME, TD_MSGTYPE_ENABLE_DISCOVERY_REQUEST,
+                        buf->data, buf->length, NULL );
+  free_buffer( buf );
+
+  expect_value( mock_topology_reply, status, TD_RESPONSE_OK );
+
+  start_event_handler();
+  start_messenger();
+
+  // check subscriber table
+  subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( ea != NULL );
+  assert_string_equal( ea->name, TEST_SUBSCRIBER_NAME );
+  assert_true( ea->use_discovery );
+
+  stop_service_management();
+
+  assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
+static void
+test_disable_discovery_from_client() {
+  // avoid periodic ping event from running.
+  void ( *original_execute_timer_events )( int *next_timeout_usec );
+  swap_original( execute_timer_events );
+
+  init_messenger( "/tmp" );
+  init_timer();
+
+  assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  start_service_management();
+  subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( e != NULL );
+  assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
+  e->use_discovery = true;
+
+  // send subscribe request
+  const size_t req_len = strlen( TEST_SUBSCRIBER_NAME ) + 1;
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_request *req = append_back_buffer( buf, req_len );
+  strcpy( req->name, TEST_SUBSCRIBER_NAME );
+  send_request_message( TEST_TREMA_NAME, TEST_SUBSCRIBER_NAME, TD_MSGTYPE_DISABLE_DISCOVERY_REQUEST,
+                        buf->data, buf->length, NULL );
+  free_buffer( buf );
+
+  expect_value( mock_topology_reply, status, TD_RESPONSE_OK );
+
+  start_event_handler();
+  start_messenger();
+
+  // check subscriber table
+  subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
+  assert_true( ea != NULL );
+  assert_string_equal( ea->name, TEST_SUBSCRIBER_NAME );
+  assert_false( ea->use_discovery );
+
+  stop_service_management();
+
+  assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
+//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
+
+  finalize_timer();
+  finalize_messenger();
+
+  revert_original( execute_timer_events );
+}
+
 /********************************************************************************
  * Run tests.
  ********************************************************************************/
@@ -548,7 +1018,7 @@ int
 main() {
   const UnitTest tests[] = {
       unit_test( test_init_finalize_service_management ),
-      unit_test_setup_teardown( test_init_start_stop_finalize_service_management, setup, teardown ),
+      unit_test_setup_teardown( test_init_start_stop_finalize_service_management, setup_fake_messenger, teardown_fake_messenger ),
 
       unit_test_setup_teardown( test_notify_switch_status_for_all_user, setup_fake_subscriber, teardown_fake_subscriber ),
       unit_test_setup_teardown( test_notify_port_status_for_all_user, setup_fake_subscriber, teardown_fake_subscriber ),
@@ -557,6 +1027,18 @@ main() {
       unit_test( test_set_switch_status_updated_hook ),
       unit_test( test_set_port_status_updated_hook ),
       unit_test( test_set_link_status_updated_hook ),
+
+      unit_test_setup_teardown( test_ping_subscriber, setup_fake_subscriber, teardown_fake_subscriber ),
+
+      unit_test_setup_teardown( test_subscribe_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_duplicate_subscribe_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
+
+      unit_test_setup_teardown( test_unsubscribe_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_duplicate_unsubscribe_from_client, setup_service_management, teardown_service_management ),
+
+      unit_test_setup_teardown( test_enable_discovery_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
+      unit_test_setup_teardown( test_disable_discovery_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
+
   };
 
   setup_leak_detector();
