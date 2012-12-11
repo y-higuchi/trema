@@ -199,7 +199,7 @@ unsubscribe( const messenger_context_handle *handle, void *data, size_t len ) {
   debug( "Received unsubscribe request from '%s'", req->name );
 
   subscriber_entry *entry = lookup_subscriber_entry( req->name );
-  if ( entry != NULL ) {
+  if ( entry == NULL ) {
     status = TD_RESPONSE_NO_SUCH_SUBSCRIBER;
   } else {
     delete_subscriber_entry( entry );
