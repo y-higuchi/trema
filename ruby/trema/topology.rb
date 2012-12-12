@@ -1,7 +1,7 @@
 require "trema/controller"
 
 module Trema
-  # module to add topology information notification handlers to Controller
+  
   module Topology
     
     #
@@ -11,6 +11,8 @@ module Trema
       # Do nothing.
     end
     
+    # @group Basic Topology events and methods
+    
     #
     # @!method topology_ready?
     # @return true if Topology service is ready to use.
@@ -19,14 +21,26 @@ module Trema
       @is_topology_ready
     end
     
+    
     #
     # @!method topology_ready(  )
     #
     # @abstract topology_ready event handler. Override this to implement a custom handler.
-    # Topology service related methods should be called after this event. 
+    # Start using Topology service related methods after this event. 
     #
     handler :topology_ready
     
+    #
+    # @!method topology_discovery_ready(  )
+    #
+    # @abstract topology_discovery_ready event handler. Override this to implement a custom handler.
+    #
+    # Start using Topology Discovery service related methods after this event. 
+    #
+    handler :topology_discovery_ready
+
+    # @group Topology update event handlers
+
     #
     # @!method switch_status_updated( sw_stat )
     #
@@ -77,9 +91,11 @@ module Trema
     #
     handler :link_status_updated
     
+    # @group Get all status event handlers
+    
     #
     # @!method all_switch_status_reply( sw_stats )
-    #
+    # Event handler for send_all_switch_status_request reply event.
     # @abstract get_all_switch_status callback handler. Override this to implement a custom handler.
     #
     # @param [Array<Hash>] sw_stats
@@ -90,7 +106,7 @@ module Trema
 
     #
     # @!method all_port_status_reply( port_stats )
-    #
+    # Event handler for send_all_port_status_request reply event.
     # @abstract get_all_port_status callback handler. Override this to implement a custom handler.
     #
     # @param [Array<Hash>] port_stats
@@ -101,7 +117,7 @@ module Trema
 
     #
     # @!method all_link_status_reply( link_stat )
-    #
+    # Event handler for send_all_link_status_request reply event.
     # @abstract get_all_link_status call handler. Override this to implement a custom handler.
     #
     # @param [Array<Hash>] link_stat
@@ -110,41 +126,38 @@ module Trema
     #
     handler :all_link_status_reply
     
-    #
-    # @!method topology_discovery_ready(  )
-    #
-    # @abstract topology_discovery_ready event handler. Override this to implement a custom handler.
-    #
-    # Topology Discovery service related methods should be called after this event. 
-    #
-    handler :topology_discovery_ready
+    # @endgroup
     
     #
     # @!method start
-    # Initialization before start_trema() call.
     # Initialize and subscribe to topology interface.
-    # This method will be implicitly called inside Controller#run! between init_trema() and start_trema() calls.
+    # Place to implement initialization before start_trema() call.
+    #
+    # This method will be implicitly called inside Controller#run! between init_trema() and start_trema() calls if not overridden by user.
     # @note Be sure to initialize and subscribe to topology if overriding this method.
     #
     # @example
     #  class MyController < Controller
     #    include Topology
     #    def start
-    #      super()
+    #      init_libtopology "topology"
+    #      subscribe_topology
+    #      # Simply calling super() instead of above may be sufficient
+    #
     #      # your application's pre-start_trema() call initialization here.
     #    end
     #  end
     #
     def start
       #  specify the name of topology service name
-      init_libtopology "topology" 
-      subscribe_topology 
+      init_libtopology "topology"
+      subscribe_topology
     end
     
     #
-    # @overload shutdown!
+    # @!method shutdown!
     #  Shutdown controller.
-    #  unsubscribe and finalize topology before stopping trema.  
+    #  Unsubscribe and finalize topology before stopping trema.  
     #
     def shutdown!
       unsubscribe_topology

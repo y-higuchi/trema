@@ -21,7 +21,7 @@ VALUE mTopology;
  * init_libtopology(service_name)
  *   Initialize topology client.
  *
- *   This method is intended to be called implicitly by TopologyNotifiedController.
+ *   This method is intended to be called inside Controller#start.
  *
  *   @param [String] service_name
  *     name of the topology service to use.
@@ -37,7 +37,7 @@ topology_init_libtopology( VALUE self, VALUE service_name ) {
  * finalize_libtopology(service_name)
  *   Finalize topology client.
  *
- *   This method is intended to be called implicitly by TopologyNotifiedController.
+ *   This method is intended to be called inside Controller#shutdown!.
  */
 static VALUE
 topology_finalize_libtopology( VALUE self ) {
@@ -179,11 +179,11 @@ handle_unsubscribed_reply( void* self, topology_response *res ) {
 }
 
 
-/*
+/**
  * subscribe_topology()
  *   Subscribe to topology.
  *
- *   This method is intended to be called implicitly by TopologyNotifiedController.
+ *   This method is intended to be called inside Controller#start.
  *
  */
 static VALUE
@@ -196,11 +196,11 @@ topology_subscribe_topology( VALUE self ) {
   return self;
 }
 
-/*
+/**
  * unsubscribe_topology()
  *   Unsubscribe from topology.
  *
- *   This method is intended to be called implicitly by TopologyNotifiedController.
+ *   This method is intended to be called inside Controller#shutdown!.
  *
  */
 static VALUE
@@ -225,7 +225,9 @@ handle_enable_topology_discovery_reply( void* self, const topology_response *res
   }
 }
 
-/*
+/**
+ *  @group Discovery control
+ *
  * Enable topology discovery.
  *
  */
@@ -246,7 +248,9 @@ handle_disable_topology_discovery_reply( void* self, const topology_response *re
   // TODO Should successful disable_topology_discovery call be notified to Ruby side?
 }
 
-/*
+/**
+ *  @group Discovery control
+ *
  * Disable topology discovery.
  *
  */
@@ -276,11 +280,15 @@ handle_get_all_link_status_callback( void *self, size_t number, const topology_l
   }
 }
 
+
 /**
- * send_all_link_status_request
+ *  @group Get all status requests
+ *
+ * Request Topology service to send all link status it holds.
+ * Results will be returned as corresponding Get all status event.
  */
 static VALUE
-topology_get_all_link_status( VALUE self ) {
+topology_send_all_link_status( VALUE self ) {
   get_all_link_status( handle_get_all_link_status_callback, (void*) self );
   return self;
 }
@@ -306,10 +314,13 @@ handle_get_all_port_status_callback( void *self, size_t number, const topology_p
 }
 
 /**
- * send_all_port_status_request
+ *  @group Get all status requests
+ *
+ * Request Topology service to send all port status it holds.
+ * Results will be returned as corresponding Get all status event.
  */
 static VALUE
-topology_get_all_port_status( VALUE self ) {
+topology_send_all_port_status( VALUE self ) {
   get_all_port_status( handle_get_all_port_status_callback, (void*) self );
   return self;
 }
@@ -336,19 +347,19 @@ handle_get_all_switch_status_callback( void *self, size_t number, const topology
 
 
 /**
- * send_all_switch_status_request
+ *  @group Get all status requests
+ *
+ * Request Topology service to send all switch status it holds.
+ * Results will be returned as corresponding Get all status event.
  */
 static VALUE
-topology_get_all_switch_status( VALUE self ) {
+topology_send_all_switch_status( VALUE self ) {
   get_all_switch_status( handle_get_all_switch_status_callback, (void*) self );
   return self;
 }
 
 void Init_topology( void ) {
-//  rb_require( "trema/controller" );
-//  VALUE cController = rb_eval_string( "Trema::Controller" );
-//  cTopologyNotifiedController = rb_define_class_under( mTrema, "TopologyNotifiedController", cController );
-  mTopology = rb_define_module_under(mTrema, "Topology" );
+  mTopology = rb_define_module_under( mTrema, "Topology" );
   rb_define_protected_method( mTopology, "init_libtopology", topology_init_libtopology, 1 );
   rb_define_protected_method( mTopology, "finalize_libtopology", topology_finalize_libtopology, 0 );
 
@@ -358,9 +369,9 @@ void Init_topology( void ) {
   rb_define_method( mTopology, "enable_topology_discovery", topology_enable_topology_discovery, 0 );
   rb_define_method( mTopology, "disable_topology_discovery", topology_disable_topology_discovery, 0 );
 
-  rb_define_method( mTopology, "send_all_link_status_request", topology_get_all_link_status, 0 );
-  rb_define_method( mTopology, "send_all_port_status_request", topology_get_all_port_status, 0 );
-  rb_define_method( mTopology, "send_all_switch_status_request", topology_get_all_switch_status, 0 );
+  rb_define_method( mTopology, "send_all_link_status_request", topology_send_all_link_status, 0 );
+  rb_define_method( mTopology, "send_all_port_status_request", topology_send_all_port_status, 0 );
+  rb_define_method( mTopology, "send_all_switch_status_request", topology_send_all_switch_status, 0 );
 
   rb_require( "trema/topology" );
 }
