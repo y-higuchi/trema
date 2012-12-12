@@ -25,7 +25,6 @@
 #include "probe_timer_table.h"
 
 #include "discovery_management.h"
-// TODO remove direct dependency to service_management.
 #include "service_management.h"
 
 
