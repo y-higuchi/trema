@@ -2,13 +2,13 @@
 module Trema
   module Topology
     
-    # Link Hash key 4-tuple's array index
+    # Link's Hash key 4-tuple's array index 
     FROM_DPID = 0
-    # Link Hash key 4-tuple's array index
+    # Link's Hash key 4-tuple's array index 
     FROM_PORTNO = 1
-    # Link Hash key 4-tuple's array index
+    # Link's Hash key 4-tuple's array index 
     TO_DPID = 2
-    # Link Hash key 4-tuple's array index
+    # Link's Hash key 4-tuple's array index 
     TO_PORTNO = 3
     
     class Port
@@ -328,8 +328,8 @@ module Trema
   # module to add cached topology information capability to Controller
   #
   # @example
-  #  class HelloSwitch < Controller
-  #    include TopologyCache
+  #  class TestSwitch < Controller
+  #    include Topology
   #  
   #    def topology_ready
   #      info "Topology ready!"
@@ -340,7 +340,7 @@ module Trema
   #    def topology_discovery_ready
   #      info "Discovery ready!"
   #      # enable cache after link discovery is ready
-  #      rebuild_cache
+  #      send_rebuild_cache_request
   #    end
   #    
   #    def cache_ready cache
@@ -348,21 +348,39 @@ module Trema
   #      p cache
   #
   #      # You can do whatever with cache after this point.
-  #      # Topology::Cache instance can be obtained later using #get_cache method.
+  #      # Topology::Cache instance can also be obtained later using #get_cache method.
+  #
+  #      # example:
+  #      # build spanning trees for each vertices
   #    end
   #    
   #    def link_status_updated link
-  #      info "link_status_updated!"
-  #      p link
+  #      # Directly read Hash containing link info.  
+  #      p link[:from_dpid]
+  #      # Or, create Topology::Link instance.
+  #      linkObj = Link.new links
+  #      p linkObj.from_dpid
   #      
   #      # Do what ever before Topology Cache update
   #      # Note: Link instance will be removed after cache update, if the state
   #      #       was not up.
-  #      
+  #
+  #      # example:
+  #      if not link[:up] then
+  #        # Link down event:
+  #        # 1. drop path, which contains this link using FlowManager::libPath.
+  #        # 2. PathResolver rebuild spanning trees.
+  #        # 3. set newly calculated path using using FlowManager::libPath.
+  #      else
+  #        # Link up event:
+  #        # 1. PathResolver rebuild spanning trees.
+  #        # 2. replace existing path  by newly calculated path using using FlowManager::libPath?
+  #      end 
+  #
   #      # (Optional) Manually update Cache
   #      # Note: Cache will be automatically updated after exit from this handler
   #      #       even if this manual update 
-  #      update_cache_by_switch_hash sw
+  #      update_cache_by_link_hash link
   #      
   #      if cache_ready?
   #        # Check to see if we're at a point after cache_ready event.
@@ -373,8 +391,7 @@ module Trema
   #    end
   #  end
   #
-  module TopologyCache
-    include Topology
+  module Topology
     
     #
     # @private Just a placeholder for YARD.
@@ -383,31 +400,33 @@ module Trema
       # Do nothing.
     end
     
-    # returns a reference to current cache
+    # @group Basic Cache events and methods
+    
+    # Returns a reference to current cache
     def get_cache
       @cache
     end
     
+    # Check if cache is ready to use.
     def cache_ready?
       @all_link and @all_switch and @all_port
     end
     
     #
     # @!method cache_ready( cache )
-    #
+    # Event handler for cache_ready event.
     # @abstract cache_ready event handler. Override this to implement a custom handler.
-    #
     # @param [Cache] cache
     #   Reference to current topology cache. 
     handler :cache_ready
     
     # 
-    # Rebuilds topology cache.
+    # Start rebuilding topology cache.
     # cache_ready will be called on cache rebuild complete
-    # @note  send_all_\\{switch,link,port\\}_status_request will be called 
-    #  internally thus all_\\{switch,link,port\\}_status_reply 
+    # @note  send_all_\\{switch,link,port \\}_status_request will be called 
+    #  internally thus all_\\{switch,link,port \\}_status_reply 
     #  event call back will be executed as a side-effect of this function call.
-    def rebuild_cache
+    def send_rebuild_cache_request
       @need_cache_ready_notify = true
       @cache_up_to_date = false
       @cache = Topology::Cache.new
@@ -420,23 +439,26 @@ module Trema
       send_all_port_status_request
     end
     
+    # Check if current cache is in latest state.
     def cache_up_to_date?
       cache_ready? and @cache_up_to_date
     end
+
+    # @group Cache manual update operations
     
-    # call inside switch_status_updated handler to update cache to latest state
+    # Call inside switch_status_updated handler to manually update cache to latest state
     # @note cache will be automatically updated after handler exit if this method was not called.
     def update_cache_by_switch_hash sw
       _switch_status_updated sw
     end
 
-    # call inside link_status_updated handler to update cache to latest state
+    # Call inside link_status_updated handler to manually update cache to latest state
     # @note cache will be automatically updated after handler exit if this method was not called.
     def update_cache_by_link_hash link
       _link_status_updated link
     end
 
-    # call inside port_status_updated handler to update cache to latest state
+    # Call inside port_status_updated handler to manually update cache to latest state
     # @note cache will be automatically updated after handler exit if this method was not called.
     def update_cache_by_port_hash port
       _port_status_updated port
