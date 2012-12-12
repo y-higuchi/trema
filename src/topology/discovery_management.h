@@ -30,4 +30,8 @@ void disable_discovery( void );
 
 // TODO Future work: port masking API etc.
 
+
+extern bool ( *send_probe )( const uint8_t *mac, uint64_t dpid, uint16_t port_no );
+
+
 #endif /* DISCOVERY_MANAGEMENT_H_ */
