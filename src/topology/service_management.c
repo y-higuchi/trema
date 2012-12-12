@@ -37,6 +37,7 @@ static void *g_port_status_updated_hook_param = NULL;
 static switch_status_updated_hook g_switch_status_updated_hook = NULL;
 static void *g_switch_status_updated_hook_param = NULL;
 
+
 bool
 set_switch_status_updated_hook( switch_status_updated_hook callback, void *param ) {
   g_switch_status_updated_hook = callback;
@@ -352,8 +353,8 @@ switch_query( const messenger_context_handle *handle, void *data, size_t len) {
   free_buffer( reply );
 }
 
-uint8_t
-set_discovered_link_status( topology_update_link_status *link_status ) {
+static uint8_t
+_set_discovered_link_status( topology_update_link_status *link_status ) {
   assert( link_status != NULL );
 
   sw_entry *sw = lookup_sw_entry( &link_status->from_dpid );
@@ -397,6 +398,10 @@ set_discovered_link_status( topology_update_link_status *link_status ) {
 
   return TD_RESPONSE_OK;
 }
+
+
+uint8_t ( *set_discovered_link_status )( topology_update_link_status* link_status ) = _set_discovered_link_status;
+
 
 static void
 update_link_status( const messenger_context_handle *handle, void *data, size_t len) {
