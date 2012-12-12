@@ -22,10 +22,12 @@
 #include <inttypes.h>
 #include <unistd.h>
 #include "trema.h"
-#include "libtopology.h"
-#include "lldp.h"
 #include "probe_timer_table.h"
+
+#include "discovery_management.h"
+// TODO remove direct dependency to service_management.
 #include "service_management.h"
+
 
 dlist_element *probe_timer_table;
 dlist_element *probe_timer_last;
@@ -183,7 +185,7 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
           break;
         case PROBE_TIMER_EVENT_TIMEOUT:
           set_wait_state( entry );
-          bool ret = send_lldp( entry );
+          bool ret = send_probe( entry->mac, entry->datapath_id, entry->port_no );
           if ( !ret ) {
             reset_wait_state( entry );
           }
@@ -224,7 +226,7 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
         case PROBE_TIMER_EVENT_TIMEOUT:
           if ( --entry->retry_count > 0 ) {
             set_wait_state( entry );
-            bool ret = send_lldp( entry );
+            bool ret = send_probe( entry->mac, entry->datapath_id, entry->port_no );
             if ( !ret ) {
               reset_wait_state( entry );
             }
@@ -355,6 +357,7 @@ remove_interval_timer( void ) {
   debug( "remove interval timer" );
 }
 
+
 static void
 interval_timer_event( void *user_data ) {
   UNUSED( user_data );
@@ -392,6 +395,8 @@ init_probe_timer_table( void ) {
 
 void
 finalize_probe_timer_table( void ) {
+  remove_interval_timer();
+
   dlist_element *dlist;
   for ( dlist = probe_timer_table->next; dlist != NULL; dlist = dlist->next ) {
     xfree( dlist->data );
@@ -399,8 +404,6 @@ finalize_probe_timer_table( void ) {
   delete_dlist( probe_timer_table );
   probe_timer_table = NULL;
   probe_timer_last = NULL;
-
-  remove_interval_timer();
 }
 
 

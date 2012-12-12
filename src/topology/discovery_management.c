@@ -6,6 +6,8 @@
  */
 
 #include "discovery_management.h"
+
+#include <assert.h>
 #include "service_management.h"
 //#include "topology_table.h"
 #include "lldp.h"
@@ -17,6 +19,8 @@
 static bool g_discovery_enabled = false;
 
 static discovery_management_options options;
+
+bool ( *send_probe )( const uint8_t *mac, uint64_t dpid, uint16_t port_no ) = send_lldp;
 
 bool
 init_discovery_management( discovery_management_options new_options ) {
@@ -156,6 +160,68 @@ switch_del_LLDP_flow_mods( sw_entry *sw, void *user_data ) {
   send_del_LLDP_flow_mods( sw );
 }
 
+static void
+ignore_packet_in( uint64_t dst_datapath_id,
+                  uint32_t transaction_id,
+                  uint32_t buffer_id,
+                  uint16_t total_len,
+                  uint16_t dst_port_no,
+                  uint8_t reason,
+                  const buffer *m,
+                  void *user_data ) {
+  UNUSED( dst_datapath_id );
+  UNUSED( transaction_id );
+  UNUSED( buffer_id );
+  UNUSED( total_len );
+  UNUSED( dst_port_no );
+  UNUSED( reason );
+  UNUSED( m );
+  UNUSED( user_data );
+}
+
+static void
+handle_packet_in( uint64_t dst_datapath_id,
+                  uint32_t transaction_id,
+                  uint32_t buffer_id,
+                  uint16_t total_len,
+                  uint16_t dst_port_no,
+                  uint8_t reason,
+                  const buffer *m,
+                  void *user_data ) {
+  UNUSED( transaction_id );
+  UNUSED( buffer_id );
+  UNUSED( total_len );
+  UNUSED( reason );
+  UNUSED( user_data );
+  packet_info *packet_info = m->user_data;
+  assert( packet_info != NULL );
+
+  // check if LLDP or not
+  if ( packet_info->eth_type != ETH_ETHTYPE_LLDP ) {
+    notice( "Non-LLDP packet is received ( type = %#x ).", packet_info->eth_type );
+    return;
+  }
+
+  uint64_t src_datapath_id;
+  uint16_t src_port_no;
+  if ( parse_lldp( &src_datapath_id, &src_port_no, m ) == false ) {
+    notice( "Failed to parse LLDP packet" );
+    return;
+  }
+
+  debug( "Receive LLDP Frame (%#" PRIx64 ", %u) from (%#" PRIx64 ", %u).",
+         dst_datapath_id, dst_port_no, src_datapath_id, src_port_no );
+  probe_timer_entry *entry = delete_probe_timer_entry( &src_datapath_id,
+                                                       src_port_no );
+  if ( entry == NULL ) {
+    debug( "Not found dst datapath_id (%#" PRIx64 ", %u).", src_datapath_id,
+            src_port_no );
+    return;
+  }
+
+  probe_request( entry, PROBE_TIMER_EVENT_RECV_LLDP, &dst_datapath_id, dst_port_no );
+}
+
 
 void
 enable_discovery( void ) {
@@ -166,11 +232,15 @@ enable_discovery( void ) {
   // insert LLDP flow entry
   foreach_sw_entry( switch_add_LLDP_flow_mods, NULL );
 
-  // update all port status
-  foreach_port_entry( port_entry_walker, NULL );
+  // start receiving packet-in
+  set_packet_in_handler( handle_packet_in, NULL );
 
   set_switch_status_updated_hook( handle_switch_status_updated_callback, NULL );
   set_port_status_updated_hook( handle_port_status_updated_callback, NULL );
+
+  // update all port status
+  foreach_port_entry( port_entry_walker, NULL );
+
 }
 
 void
@@ -181,6 +251,9 @@ disable_discovery( void ) {
   }
   g_discovery_enabled = false;
 
+  // stop receiving packet-in
+  set_packet_in_handler( ignore_packet_in, NULL );
+
   // ignore switch/port events
   set_switch_status_updated_hook( NULL, NULL );
   set_port_status_updated_hook( NULL, NULL );
@@ -188,3 +261,4 @@ disable_discovery( void ) {
   // remove LLDP flow entry
   foreach_sw_entry( switch_del_LLDP_flow_mods, NULL );
 }
+
