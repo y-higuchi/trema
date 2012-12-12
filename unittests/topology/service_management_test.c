@@ -806,9 +806,9 @@ test_ping_subscriber() {
 
   subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( e != NULL );
+  // -1 sec to assure time stamp change observable.
+  e->last_seen--;
   g_last_seen = e->last_seen;
-  // sleep 1 sec to assure time stamp to change.
-  sleep(1);
 
 
   start_service_management();

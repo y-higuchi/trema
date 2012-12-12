@@ -15,6 +15,7 @@
 
 #include "lldp.h"
 
+#include "trema.h"
 
 /********************************************************************************
  * Common function.
@@ -145,11 +146,9 @@ test_send_lldp() {
 
   assert_true( init_lldp( options ) );
 
-  probe_timer_entry port = {
-      .datapath_id = 0x1234,
-      .port_no = 42,
-      .mac = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-  };
+  uint64_t datapath_id = 0x1234;
+  uint16_t port_no = 42;
+  uint8_t mac[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 
   // dummy OFA receiving notification
   const char* SRC_SW_MSNGER_NAME = "switch.0x1234";
@@ -158,11 +157,11 @@ test_send_lldp() {
   expect_value( helper_sw_message_received_end, tag, MESSENGER_OPENFLOW_MESSAGE );
   expect_value( helper_sw_message_received_end, datapath_id, 0x1234 );
   expect_value( helper_sw_message_received_end, port, 42 );
-  expect_memory( helper_sw_message_received_end, macsa, port.mac, ETH_ADDRLEN );
+  expect_memory( helper_sw_message_received_end, macsa, mac, ETH_ADDRLEN );
   expect_string( helper_sw_message_received_end, chassis_id, "0x1234" );
   expect_string( helper_sw_message_received_end, port_id, "42" );
 
-  assert_true( send_lldp( &port ) );
+  assert_true( send_lldp( mac, datapath_id, port_no ) );
 
   start_messenger();
   start_event_handler();
@@ -271,11 +270,9 @@ test_send_lldp_over_ip() {
 
   assert_true( init_lldp( options ) );
 
-  probe_timer_entry port = {
-      .datapath_id = 0x1234,
-      .port_no = 42,
-      .mac = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-  };
+  uint64_t datapath_id = 0x1234;
+  uint16_t port_no = 42;
+  uint8_t mac[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 
   // dummy OFA receiving notification
   const char* SRC_SW_MSNGER_NAME = "switch.0x1234";
@@ -286,11 +283,11 @@ test_send_lldp_over_ip() {
   expect_value( helper_sw_message_over_ip_received_end, port, 42 );
   expect_value( helper_sw_message_over_ip_received_end, src_ip, options.lldp_ip_src );
   expect_value( helper_sw_message_over_ip_received_end, dst_ip, options.lldp_ip_dst );
-  expect_memory( helper_sw_message_over_ip_received_end, macsa, port.mac, ETH_ADDRLEN );
+  expect_memory( helper_sw_message_over_ip_received_end, macsa, mac, ETH_ADDRLEN );
   expect_string( helper_sw_message_over_ip_received_end, chassis_id, "0x1234" );
   expect_string( helper_sw_message_over_ip_received_end, port_id, "42" );
 
-  assert_true( send_lldp( &port ) );
+  assert_true( send_lldp( mac, datapath_id, port_no ) );
 
   start_messenger();
   start_event_handler();
@@ -323,7 +320,7 @@ main() {
       unit_test( test_send_lldp ),
       unit_test( test_send_lldp_over_ip ),
       unit_test_setup_teardown( test_init_finalize_lldp, setup, teardown ),
-      // TODO receive LLDP related tests.
+      // TODO parse LLDP related tests.
   };
 
   setup_leak_detector();
