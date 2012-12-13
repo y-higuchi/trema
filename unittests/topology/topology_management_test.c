@@ -23,12 +23,15 @@
  * Mock functions.
  ********************************************************************************/
 
+
 #define swap_original( funcname ) \
   original_##funcname = funcname;\
   funcname = mock_##funcname;
 
 #define revert_original( funcname ) \
   funcname = original_##funcname;
+
+
 
 
 /********************************************************************************
