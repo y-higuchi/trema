@@ -39,27 +39,30 @@ static void *g_switch_status_updated_hook_param = NULL;
 
 
 bool
-set_switch_status_updated_hook( switch_status_updated_hook callback, void *param ) {
+_set_switch_status_updated_hook( switch_status_updated_hook callback, void *param ) {
   g_switch_status_updated_hook = callback;
   g_switch_status_updated_hook_param = param;
   return true;
 }
+bool ( *set_switch_status_updated_hook )( switch_status_updated_hook, void *user_data ) = _set_switch_status_updated_hook;
 
 bool
-set_port_status_updated_hook( port_status_updated_hook callback, void *param ) {
+_set_port_status_updated_hook( port_status_updated_hook callback, void *param ) {
   g_port_status_updated_hook = callback;
   g_port_status_updated_hook_param = param;
 
   return true;
 }
+bool ( *set_port_status_updated_hook )( port_status_updated_hook, void *user_data ) = _set_port_status_updated_hook;
 
 
 bool
-set_link_status_updated_hook( link_status_updated_hook callback, void *param ) {
+_set_link_status_updated_hook( link_status_updated_hook callback, void *param ) {
   g_link_status_updated_hook = callback;
   g_link_status_updated_hook_param = param;
   return true;
 }
+bool ( *set_link_status_updated_hook )( link_status_updated_hook, void *user_data ) = _set_link_status_updated_hook;
 
 static buffer *
 create_topology_response_message( uint8_t status ) {

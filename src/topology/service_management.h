@@ -48,9 +48,9 @@ void notify_link_status_for_all_user( port_entry *port );
 
 // for topology local use
 
-bool set_link_status_updated_hook( link_status_updated_hook, void *user_data );
-bool set_port_status_updated_hook( port_status_updated_hook, void *user_data );
-bool set_switch_status_updated_hook( switch_status_updated_hook, void *user_data );
+extern bool ( *set_link_status_updated_hook )( link_status_updated_hook, void *user_data );
+extern bool ( *set_port_status_updated_hook )( port_status_updated_hook, void *user_data );
+extern bool ( *set_switch_status_updated_hook )( switch_status_updated_hook, void *user_data );
 
 extern uint8_t ( *set_discovered_link_status )( topology_update_link_status* link_status );
 
