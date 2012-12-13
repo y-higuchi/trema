@@ -69,18 +69,24 @@ helper_sw_message_received_end( uint16_t tag, void *data, size_t len ) {
   check_expected( tag );
   UNUSED( len );
 
+  buffer* parse_lldp_buffer = alloc_buffer_with_length(len);
+  void* parse_data = append_back_buffer( parse_lldp_buffer, len );
+  memcpy( parse_data, data, len );
+
   openflow_service_header_t* of_s_h = data;
   const uint64_t datapath_id = ntohll( of_s_h->datapath_id );
   check_expected( datapath_id );
-  const size_t header_length = sizeof(openflow_service_header_t) + ntohs( of_s_h->service_name_length );
+  const size_t ofs_header_length = sizeof(openflow_service_header_t) + ntohs( of_s_h->service_name_length );
 
-  struct ofp_header* ofp_header = (struct ofp_header*) (((char*)data) + header_length);
+
+  struct ofp_header* ofp_header = (struct ofp_header*) (((char*)data) + ofs_header_length);
   assert( ofp_header->type == OFPT_PACKET_OUT );
 
-  struct ofp_packet_out* packet_out = (struct ofp_packet_out*) (((char*)data) + header_length);
+  struct ofp_packet_out* packet_out = (struct ofp_packet_out*) (((char*)data) + ofs_header_length);
   const uint16_t actions_len = ntohs(packet_out->actions_len);
   assert( actions_len > 0 );
   assert( actions_len == sizeof( struct ofp_action_output ) );
+
 
   struct ofp_action_header* act_header = (struct ofp_action_header*) (((char*)packet_out) + offsetof( struct ofp_packet_out, actions ));
   const uint16_t action_type = act_header->type;
@@ -98,6 +104,7 @@ helper_sw_message_received_end( uint16_t tag, void *data, size_t len ) {
   assert_memory_equal( ether_frame->macda, default_lldp_mac_dst, ETH_ADDRLEN );
   const uint8_t* macsa = ether_frame->macsa;
   check_expected( macsa );
+
 
   // chassis
   struct tlv* chassis_id_tlv = (struct tlv*) (((char*)ether_frame) + sizeof(ether_header_t));
@@ -131,6 +138,21 @@ helper_sw_message_received_end( uint16_t tag, void *data, size_t len ) {
   assert_int_equal( ((ntohs(end_tlv->type_len) & 0xFE00)>>9), LLDP_TYPE_END ); // upper 7bits in uint16_t;
   const uint16_t end_tlv_len = ntohs(end_tlv->type_len) & 0x1FF; // lower 9bits in uint16_t;
   assert_int_equal( end_tlv_len, 0 );
+
+
+  // test parse_lldp
+  // extract ethernet frame
+  remove_front_buffer( parse_lldp_buffer, (size_t)(((char*)ether_frame) - ((char*)data)) );
+  bool parse_ok = parse_packet( parse_lldp_buffer );
+  assert_true( parse_ok );
+
+  uint64_t parsed_dpid;
+  uint16_t parsed_port_no;
+  parse_ok = parse_lldp( &parsed_dpid, &parsed_port_no, parse_lldp_buffer );
+  assert_true( parse_ok );
+  assert_int_equal( parsed_dpid, datapath_id );
+  assert_int_equal( parsed_port_no, atoi(port_id) );
+  free_buffer( parse_lldp_buffer );
 
   stop_event_handler();
   stop_messenger();
@@ -176,6 +198,10 @@ static void
 helper_sw_message_over_ip_received_end( uint16_t tag, void *data, size_t len ) {
   check_expected( tag );
   UNUSED( len );
+
+  buffer* parse_lldp_buffer = alloc_buffer_with_length(len);
+  void* parse_data = append_back_buffer( parse_lldp_buffer, len );
+  memcpy( parse_data, data, len );
 
   openflow_service_header_t* of_s_h = data;
   const uint64_t datapath_id = ntohll( of_s_h->datapath_id );
@@ -254,6 +280,20 @@ helper_sw_message_over_ip_received_end( uint16_t tag, void *data, size_t len ) {
   const uint16_t end_tlv_len = ntohs(end_tlv->type_len) & 0x1FF; // lower 9bits in uint16_t;
   assert_int_equal( end_tlv_len, 0 );
 
+  // test parse_lldp
+  // extract ethernet frame
+  remove_front_buffer( parse_lldp_buffer, (size_t)(((char*)ether_frame) - ((char*)data)) );
+  bool parse_ok = parse_packet( parse_lldp_buffer );
+  assert_true( parse_ok );
+
+  uint64_t parsed_dpid;
+  uint16_t parsed_port_no;
+  parse_ok = parse_lldp( &parsed_dpid, &parsed_port_no, parse_lldp_buffer );
+  assert_true( parse_ok );
+  assert_int_equal( parsed_dpid, datapath_id );
+  assert_int_equal( parsed_port_no, atoi(port_id) );
+  free_buffer( parse_lldp_buffer );
+
   stop_event_handler();
   stop_messenger();
 }
@@ -320,7 +360,6 @@ main() {
       unit_test( test_send_lldp ),
       unit_test( test_send_lldp_over_ip ),
       unit_test_setup_teardown( test_init_finalize_lldp, setup, teardown ),
-      // TODO parse LLDP related tests.
   };
 
   setup_leak_detector();
