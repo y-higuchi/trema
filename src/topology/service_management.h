@@ -42,9 +42,9 @@ void finalize_service_management();
 bool start_service_management( void );
 void stop_service_management( void );
 
-void notify_switch_status_for_all_user( sw_entry *sw );
-void notify_port_status_for_all_user( port_entry *port );
-void notify_link_status_for_all_user( port_entry *port );
+extern void ( *notify_switch_status_for_all_user )( sw_entry *sw );
+extern void ( *notify_port_status_for_all_user )( port_entry *port );
+extern void ( *notify_link_status_for_all_user )( port_entry *port );
 
 // for topology local use
 
