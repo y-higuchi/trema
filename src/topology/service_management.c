@@ -46,6 +46,7 @@ _set_switch_status_updated_hook( switch_status_updated_hook callback, void *para
 }
 bool ( *set_switch_status_updated_hook )( switch_status_updated_hook, void *user_data ) = _set_switch_status_updated_hook;
 
+
 bool
 _set_port_status_updated_hook( port_status_updated_hook callback, void *param ) {
   g_port_status_updated_hook = callback;
@@ -63,6 +64,7 @@ _set_link_status_updated_hook( link_status_updated_hook callback, void *param ) 
   return true;
 }
 bool ( *set_link_status_updated_hook )( link_status_updated_hook, void *user_data ) = _set_link_status_updated_hook;
+
 
 static buffer *
 create_topology_response_message( uint8_t status ) {
@@ -216,6 +218,7 @@ unsubscribe( const messenger_context_handle *handle, void *data, size_t len ) {
   free_buffer( response );
 }
 
+
 static void
 subscriber_has_discovery_enabled( subscriber_entry *entry, void *user_data ) {
   bool *isDiscoveryEnabled = user_data;
@@ -223,6 +226,7 @@ subscriber_has_discovery_enabled( subscriber_entry *entry, void *user_data ) {
     *isDiscoveryEnabled = true;
   }
 }
+
 
 static void
 enable_discovery_request( const messenger_context_handle *handle, void *data, size_t len) {
@@ -356,6 +360,7 @@ switch_query( const messenger_context_handle *handle, void *data, size_t len) {
   free_buffer( reply );
 }
 
+
 static uint8_t
 _set_discovered_link_status( topology_update_link_status *link_status ) {
   assert( link_status != NULL );
@@ -401,8 +406,6 @@ _set_discovered_link_status( topology_update_link_status *link_status ) {
 
   return TD_RESPONSE_OK;
 }
-
-
 uint8_t ( *set_discovered_link_status )( topology_update_link_status* link_status ) = _set_discovered_link_status;
 
 
@@ -506,6 +509,7 @@ recv_ping_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
   entry->last_seen = time( NULL );
 }
 
+
 static void
 recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
   switch ( tag ) {
@@ -530,8 +534,8 @@ notify_link_status( subscriber_entry *entry, void *user_data ) {
 }
 
 
-void
-notify_link_status_for_all_user( port_entry *port ) {
+static void
+_notify_link_status_for_all_user( port_entry *port ) {
   if( g_link_status_updated_hook != NULL ){
       g_link_status_updated_hook( g_link_status_updated_hook_param, port );
   }
@@ -542,6 +546,7 @@ notify_link_status_for_all_user( port_entry *port ) {
   foreach_subscriber( notify_link_status, notify );
   free_buffer( notify );
 }
+void ( *notify_link_status_for_all_user )( port_entry *port ) = _notify_link_status_for_all_user;
 
 
 static void
@@ -555,8 +560,8 @@ notify_port_status( subscriber_entry *entry, void *user_data ) {
 }
 
 
-void
-notify_port_status_for_all_user( port_entry *port ) {
+static void
+_notify_port_status_for_all_user( port_entry *port ) {
   debug( "notify port status" );
 
   if( g_port_status_updated_hook != NULL ) {
@@ -569,6 +574,8 @@ notify_port_status_for_all_user( port_entry *port ) {
   foreach_subscriber( notify_port_status, notify );
   free_buffer( notify );
 }
+void ( *notify_port_status_for_all_user )( port_entry *port ) = _notify_port_status_for_all_user;
+
 
 static void
 notify_switch_status( subscriber_entry *entry, void *user_data ) {
@@ -580,8 +587,9 @@ notify_switch_status( subscriber_entry *entry, void *user_data ) {
   debug( "notify switch status to %s", entry->name );
 }
 
-void
-notify_switch_status_for_all_user( sw_entry *sw ) {
+
+static void
+_notify_switch_status_for_all_user( sw_entry *sw ) {
   debug( "notify switch status" );
 
   if( g_switch_status_updated_hook != NULL ) {
@@ -594,6 +602,8 @@ notify_switch_status_for_all_user( sw_entry *sw ) {
   foreach_subscriber( notify_switch_status, notify );
   free_buffer( notify );
 }
+void ( *notify_switch_status_for_all_user )( sw_entry *sw ) = _notify_switch_status_for_all_user;
+
 
 static buffer*
 create_topology_request_message( const char *name ) {
@@ -629,11 +639,13 @@ ping_subscriber( subscriber_entry *entry, void *user_data ) {
   }
 }
 
+
 void
 ping_all_subscriber( void* user_data ) {
   debug( "Sending ping to each subscribers" );
   foreach_subscriber( ping_subscriber, user_data );
 }
+
 
 bool
 start_service_management( void ) {
