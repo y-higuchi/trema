@@ -173,10 +173,15 @@ handle_switch_features_reply( uint64_t datapath_id, uint32_t transaction_id,
             phy_port->port_no, datapath_id );
       continue;
     }
-    port_entry *port = update_port_entry( sw, phy_port->port_no, phy_port->name );
-    port->id = transaction_id;
-    info( "Port mod ([%#" PRIx64 "]:%u)", datapath_id, phy_port->port_no );
-    update_port_notification( sw, port, phy_port );
+    port_entry *port = lookup_port_entry_by_port( sw, phy_port->port_no );
+    if ( port == NULL ) {
+      info( "Port add ([%#" PRIx64 "]:%u)", datapath_id, phy_port->port_no );
+      add_port_notification( sw, phy_port );
+    } else {
+      port->id = transaction_id;
+      info( "Port mod ([%#" PRIx64 "]:%u)", datapath_id, phy_port->port_no );
+      update_port_notification( sw, port, phy_port );
+    }
     debug( "Updated features-reply from switch(%#" PRIx64 "), port_no(%u).",
            datapath_id, phy_port->port_no );
   }
