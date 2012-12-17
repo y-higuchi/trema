@@ -1,5 +1,5 @@
 /*
- * discovery_management_test.c
+ * topology_management_test.c
  *
  *  Created on: 2012/11/22
  *      Author: y-higuchi
