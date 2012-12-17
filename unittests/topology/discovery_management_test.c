@@ -348,7 +348,6 @@ test_switch_status_event_then_flow_mod_lldp_if_sw_up() {
   // Test: send LLDP flow mod if sw up
 
   // dummy OFA receiving notification
-  UNUSED( helper_sw_received_flow_mod_add_lldp_message_end );
   const char* SRC_SW_MSNGER_NAME = "switch.0x1234";
   assert_true( add_message_received_callback( SRC_SW_MSNGER_NAME, helper_sw_received_flow_mod_add_lldp_message_end ) );
 
