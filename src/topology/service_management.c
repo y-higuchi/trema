@@ -237,6 +237,7 @@ enable_discovery_request( const messenger_context_handle *handle, void *data, si
 
   topology_request *req = data;
   uint8_t status = TD_RESPONSE_OK;
+  debug( "Received enable discovery request from '%s'", req->name );
 
   subscriber_entry *entry = lookup_subscriber_entry( req->name );
   if( entry == NULL ) {
@@ -271,6 +272,7 @@ disable_discovery_request( const messenger_context_handle *handle, void *data, s
 
   topology_request *req = data;
   uint8_t status = TD_RESPONSE_OK;
+  debug( "Received disable discovery request from '%s'", req->name );
 
   subscriber_entry *entry = lookup_subscriber_entry( req->name );
   if( entry == NULL ) {
@@ -305,8 +307,9 @@ link_query_walker( port_entry *entry, void *user_data ) {
 
 static void
 link_query( const messenger_context_handle *handle, void *data, size_t len ) {
-  UNUSED( data );
   UNUSED( len );
+  topology_request *req = data;
+  debug( "Received link query request from '%s'", req->name );
 
   buffer *reply = create_link_status_message();
   foreach_port_entry( link_query_walker, reply );
@@ -327,8 +330,9 @@ port_query_walker( port_entry *entry, void *user_data ) {
 
 static void
 port_query( const messenger_context_handle *handle, void *data, size_t len) {
-  UNUSED( data );
   UNUSED( len );
+  topology_request *req = data;
+  debug( "Received port query request from '%s'", req->name );
 
   buffer *reply = create_port_status_message();
   foreach_port_entry( port_query_walker, reply );
@@ -349,8 +353,9 @@ switch_query_walker( sw_entry *entry, void *user_data ) {
 
 static void
 switch_query( const messenger_context_handle *handle, void *data, size_t len) {
-  UNUSED( data );
   UNUSED( len );
+  topology_request *req = data;
+  debug( "Received switch query request from '%s'", req->name );
 
   buffer *reply = create_switch_status_message();
   foreach_sw_entry( switch_query_walker, reply );
