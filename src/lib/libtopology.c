@@ -1,7 +1,7 @@
 /*
  * Author: Shuji Ishii, Kazushi SUGYO
  *
- * Copyright (C) 2008-2011 NEC Corporation
+ * Copyright (C) 2008-2013 NEC Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2, as
@@ -40,8 +40,12 @@ static void ( *port_status_updated_callback )( void *,
                                               const topology_port_status * ) = NULL;
 static void *port_status_updated_callback_param = NULL;
 
+static void ( *switch_status_updated_callback )( void *, const topology_switch_status* ) = NULL;
+static void *switch_status_updated_callback_param = NULL;
+
 static hash_table *transaction_table = NULL;
 
+static bool is_subscribed = false;
 
 struct send_request_param {
   void ( *callback )();
@@ -52,9 +56,9 @@ struct send_request_param {
 };
 
 
-buffer *
+static buffer*
 create_request_message( const char *name ) {
-  size_t req_len = strlen( libtopology_queue_name ) + 1;
+  size_t req_len = strlen( name ) + 1;
   buffer *buf = alloc_buffer_with_length( req_len );
   topology_request *req = append_back_buffer( buf, req_len );
   strcpy( req->name, name );
@@ -87,7 +91,7 @@ unmark_transaction( struct send_request_param *param ) {
 }
 
 
-struct send_request_param *
+static struct send_request_param *
 create_request_param( void ( *callback )(), void *user_data ) {
   struct send_request_param *param = xmalloc( sizeof( *param ) );
   param->callback = callback;
@@ -97,13 +101,13 @@ create_request_param( void ( *callback )(), void *user_data ) {
 }
 
 
-static void
+static bool
 send_request( uint16_t message_type, void ( *callback )(), void *user_data ) {
   // register transaction and continuation
   // make request header
   buffer *buf = create_request_message( libtopology_queue_name );
 
-  void *param = create_request_param( callback, user_data );
+  struct send_request_param *param = create_request_param( callback, user_data );
   mark_transaction( param, message_type );
 
   bool ret = send_request_message( topology_name, libtopology_queue_name,
@@ -112,12 +116,15 @@ send_request( uint16_t message_type, void ( *callback )(), void *user_data ) {
 
   if ( !ret ) {
     warn("Failed to send a request message %d to %s.", message_type, topology_name);
+    unmark_transaction( param );
+    xfree( param );
   }
   free_buffer( buf );
+  return ret;
 }
 
 
-buffer *
+static buffer *
 create_update_link_status_message( const topology_update_link_status *link_status ) {
   buffer *buf = alloc_buffer_with_length( sizeof( topology_update_link_status ) );
   topology_update_link_status *req = append_back_buffer( buf, sizeof( topology_update_link_status ) );
@@ -139,15 +146,17 @@ send_update_link_status( const topology_update_link_status *link_status,
   // make request header
   buffer *buf = create_update_link_status_message( link_status );
 
-  void *param = create_request_param( callback, user_data );
-  mark_transaction( param, TD_MSGTYPE_UPDATE_LINK_STATUS );
+  struct send_request_param *param = create_request_param( callback, user_data );
+  mark_transaction( param, TD_MSGTYPE_UPDATE_LINK_STATUS_REQUEST );
 
   bool ret = send_request_message( topology_name, libtopology_queue_name,
-                              TD_MSGTYPE_UPDATE_LINK_STATUS,
+                              TD_MSGTYPE_UPDATE_LINK_STATUS_REQUEST,
                               buf->data, buf->length, param );
 
   if ( !ret ) {
-    warn("Failed to send a set link status request to %s.", topology_name);
+    warn( "Failed to send a set link status request to %s.", topology_name );
+    unmark_transaction( param );
+    xfree( param );
   }
   free_buffer( buf );
 
@@ -157,9 +166,10 @@ send_update_link_status( const topology_update_link_status *link_status,
 
 // handle reply from topology
 static void
-recv_query_link_status_reply( uint16_t tag __attribute__((unused)) ,
+recv_query_link_status_reply( uint16_t tag,
                               void *data, size_t len,
                               void *param0 ) {
+  UNUSED( tag );
   topology_link_status *const link_status = data;
   const int number_of_links =( int ) ( len / sizeof( topology_link_status ) );
   int i;
@@ -186,9 +196,10 @@ recv_query_link_status_reply( uint16_t tag __attribute__((unused)) ,
 
 // handle reply from topology
 static void
-recv_query_port_status_reply( uint16_t tag __attribute__((unused)) ,
+recv_query_port_status_reply( uint16_t tag,
                               void *data, size_t len,
                               void *param0 ) {
+  UNUSED( tag );
   topology_port_status *const port_status = data;
   const int number_of_ports =( int ) ( len / sizeof( topology_port_status ) );
   int i;
@@ -213,11 +224,11 @@ recv_query_port_status_reply( uint16_t tag __attribute__((unused)) ,
 
 // handle reply from topology
 static void
-recv_query_switch_status_reply( uint16_t tag __attribute__((unused)) ,
-                                void *data, size_t len,
-                                void *param0 ) {
+recv_query_switch_status_reply( uint16_t tag,
+                                void *data, size_t len, void *param0 ) {
+  UNUSED( tag );
   topology_switch_status *const switch_status = data;
-  const int number_of_ports = ( int ) ( len / sizeof( topology_switch_status ) );
+  const int number_of_switches = ( int ) ( len / sizeof( topology_switch_status ) );
   int i;
   struct send_request_param *param = param0;
 
@@ -225,13 +236,13 @@ recv_query_switch_status_reply( uint16_t tag __attribute__((unused)) ,
     debug( "%s: callback is NULL", __FUNCTION__ );
   } else {
     // rearrange byte order
-    for ( i = 0; i < number_of_ports; i++ ) {
+    for ( i = 0; i < number_of_switches; i++ ) {
       topology_switch_status *s = &switch_status[ i ];
       s->dpid = ntohll( s->dpid );
     }
 
     // rebuild link topology
-    ( *param->callback )( param->user_data, number_of_ports, switch_status );
+    ( *param->callback )( param->user_data, number_of_switches, switch_status );
   }
   xfree( param );
 }
@@ -239,8 +250,8 @@ recv_query_switch_status_reply( uint16_t tag __attribute__((unused)) ,
 
 // handle asynchronouse notification from topology
 static void
-recv_link_status_notification( uint16_t tag __attribute__((unused)),
-                               void *data, size_t len ) {
+recv_link_status_notification( uint16_t tag, void *data, size_t len ) {
+  UNUSED( tag );
   topology_link_status *const link_status = data;
   const int number_of_links = ( int ) ( len / sizeof( topology_link_status ) );
   int i;
@@ -257,16 +268,19 @@ recv_link_status_notification( uint16_t tag __attribute__((unused)),
     s->from_portno = ntohs( s->from_portno );
     s->to_dpid = ntohll( s->to_dpid );
     s->to_portno = ntohs( s->to_portno );
+
+    // TODO update link cache when implementing Topology cache in C
+
     ( *link_status_updated_callback )( link_status_updated_callback_param, s );
   }
 }
 
 
-// handle asynchronouse notification from topology
+// handle asynchronous notification from topology
 static void
-recv_port_status_notification( uint16_t tag __attribute__((unused)),
-                               void *data,
-                               size_t len __attribute__((unused)) ) {
+recv_port_status_notification( uint16_t tag, void *data, size_t len ) {
+  UNUSED( tag );
+  UNUSED( len );
   topology_port_status *const port_status = data;
 
   if ( port_status_updated_callback == NULL ) {
@@ -279,91 +293,245 @@ recv_port_status_notification( uint16_t tag __attribute__((unused)),
   s->dpid = ntohll( s->dpid );
   s->port_no = ntohs( s->port_no );
 
+  // TODO update port cache when implementing Topology cache in C
+
   // (re)build port db
   ( *port_status_updated_callback )( port_status_updated_callback_param, s );
 }
 
 static void
-recv_subscribe_reply( uint16_t tag __attribute__((unused)),
-                      void *data __attribute__((unused)),
-                      size_t len __attribute__((unused)),
-                      void *param0 ) {
-  // TODO: check response status
+recv_switch_status_notification( uint16_t tag, void *data, size_t len ) {
+  UNUSED( tag );
+  UNUSED( len );
+  topology_switch_status* switch_status = data;
 
+  if( switch_status_updated_callback == NULL ) {
+    debug( "%s: callback is NULL", __FUNCTION__ );
+    return;
+  }
+
+  // arrange byte order
+  switch_status->dpid = ntohll( switch_status->dpid );
+
+  // TODO update switch cache when implementing Topology cache in C
+
+  (* switch_status_updated_callback )( switch_status_updated_callback_param, switch_status );
+}
+
+static void
+recv_ping_request( const messenger_context_handle *handle, void *data, size_t len ) {
+  UNUSED( len );
+  UNUSED( data );
+
+//  topology_request *req = data;
+
+  // respond to topology ping
+  const size_t name_bytes = strlen( libtopology_queue_name ) + 1;
+  const size_t req_len = sizeof(topology_ping_response) + name_bytes;
+
+  buffer *buf = alloc_buffer_with_length( req_len );
+  topology_ping_response *res = append_back_buffer( buf, req_len );
+  strncpy( res->name, libtopology_queue_name, name_bytes );
+//  assert( res->name[name_bytes] == '\0' );
+
+  bool ret = send_reply_message( handle, TD_MSGTYPE_PING_RESPONSE,
+                      buf->data, buf->length );
+  if ( !ret ) {
+    warn( "Failed to respond to ping from topology." );
+  }
+  free_buffer( buf );
+}
+
+static void
+recv_topology_response( uint16_t tag, void *data, size_t len, void *param0 ) {
+  UNUSED( tag );
+  if( len < sizeof(topology_response) ) {
+    error( "Invalid data length. (tag=%#x len=%zu, where > %zu expected)", tag, len, sizeof(topology_response) );
+    return;
+  }
+  topology_response *res = data;
   struct send_request_param *param = param0;
+
+  if( res->status != TD_RESPONSE_OK ){
+    warn( "Response other than TD_RESPONSE_OK received. (tag=%#x, status=%#x)", tag, res->status );
+  }
 
   if ( param->callback == NULL ) {
     debug( "%s: callback is NULL", __FUNCTION__ );
   } else {
-    ( *param->callback )( param->user_data );
+    ( *param->callback )( param->user_data, res );
   }
   xfree( param );
 }
 
 
-void
-subscribe_topology( void ( *callback )( void *user_data ), void *user_data ) {
-  send_request( TD_MSGTYPE_SUBSCRIBE, callback, user_data );
+static void
+recv_subscribe_reply( uint16_t tag, void *data, size_t len, void *param0 ) {
+  UNUSED( tag );
+  topology_response *res = data;
+
+  switch ( res->status ) {
+  case TD_RESPONSE_OK:
+    is_subscribed = true;
+    break;
+  case TD_RESPONSE_ALREADY_SUBSCRIBED:
+    warn( "%s: Already subscribed.", __func__ );
+    is_subscribed = true;
+    break;
+  }
+
+  recv_topology_response(tag, data, len, param0);
+}
+
+
+static void
+recv_unsubscribe_reply( uint16_t tag, void *data, size_t len, void *param0 ) {
+  UNUSED( tag );
+  topology_response *res = data;
+
+  switch ( res->status ) {
+  case TD_RESPONSE_OK:
+    is_subscribed = false;
+    break;
+  case TD_RESPONSE_NO_SUCH_SUBSCRIBER:
+    warn( "%s: Was not subscribed.", __func__ );
+    is_subscribed = false;
+    break;
+  }
+
+  recv_topology_response(tag, data, len, param0);
+}
+
+bool
+subscribe_topology( void ( *callback )( void *user_data, topology_response *res ), void *user_data ) {
+  if( is_subscribed ){
+      debug( "%s: Already subscribed.", __func__ );
+  }
+  return send_request( TD_MSGTYPE_SUBSCRIBE_REQUEST, callback, user_data );
+}
+
+bool
+unsubscribe_topology( void ( *callback )( void *user_data, topology_response *res ), void *user_data ) {
+  if( !is_subscribed ){
+      debug( "%s: Not subscribed.", __func__ );
+  }
+  return send_request( TD_MSGTYPE_UNSUBSCRIBE_REQUEST, callback, user_data );
+}
+
+bool
+enable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
+  return send_request( TD_MSGTYPE_ENABLE_DISCOVERY_REQUEST, callback, user_data );
+}
+
+bool
+disable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
+  return send_request( TD_MSGTYPE_DISABLE_DISCOVERY_REQUEST, callback, user_data );
 }
 
 
 static void
 recv_reply( uint16_t tag, void *data, size_t len, void *user_data ) {
-  unmark_transaction( user_data );
+  unmark_transaction( (struct send_request_param *)user_data );
+  debug( "%s: %#x", __func__, (unsigned int)tag );
 
   switch ( tag ) {
-  case TD_MSGTYPE_RESPONSE:
+  case TD_MSGTYPE_SUBSCRIBE_RESPONSE:
     recv_subscribe_reply( tag, data, len, user_data );
     break;
 
-  case TD_MSGTYPE_LINK_STATUS:
+  case TD_MSGTYPE_UNSUBSCRIBE_RESPONSE:
+    recv_unsubscribe_reply( tag, data, len, user_data );
+    break;
+
+  case TD_MSGTYPE_QUERY_LINK_STATUS_RESPONSE:
     recv_query_link_status_reply( tag, data, len, user_data );
     break;
 
-  case TD_MSGTYPE_PORT_STATUS:
+  case TD_MSGTYPE_QUERY_PORT_STATUS_RESPONSE:
     recv_query_port_status_reply( tag, data, len, user_data );
     break;
 
-  case TD_MSGTYPE_SWITCH_STATUS:
+  case TD_MSGTYPE_QUERY_SWITCH_STATUS_RESPONSE:
     recv_query_switch_status_reply( tag, data, len, user_data );
     break;
 
+  case TD_MSGTYPE_UPDATE_LINK_STATUS_RESPONSE:
+    // nothing to do. using default handler.
+    recv_topology_response( tag, data, len, user_data );
+    break;
+
+  case TD_MSGTYPE_PING_RESPONSE:
+    // TODO add handler for client -> server ping response
+    recv_topology_response( tag, data, len, user_data );
+    break;
+
+  case TD_MSGTYPE_ENABLE_DISCOVERY_RESPONSE:
+    // nothing to do. using default handler.
+    recv_topology_response( tag, data, len, user_data );
+    break;
+
+  case TD_MSGTYPE_DISABLE_DISCOVERY_RESPONSE:
+    // nothing to do. using default handler.
+    recv_topology_response( tag, data, len, user_data );
+    break;
+
   default:
-    die( "unknown type: %d", tag );
+    warn( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
   }
 }
 
 
 static void
 recv_status_notification( uint16_t tag, void *data, size_t len ) {
+  debug( "%s: %#x", __func__, (unsigned int)tag );
   switch ( tag ) {
-  case TD_MSGTYPE_LINK_STATUS:
+  case TD_MSGTYPE_LINK_STATUS_NOTIFICATION:
     recv_link_status_notification( tag, data, len );
     break;
 
-  case TD_MSGTYPE_PORT_STATUS:
+  case TD_MSGTYPE_PORT_STATUS_NOTIFICATION:
     recv_port_status_notification( tag, data, len );
     break;
 
+  case TD_MSGTYPE_SWITCH_STATUS_NOTIFICATION:
+    recv_switch_status_notification( tag, data, len );
+    break;
+
   default:
-    die( "unknown type: %d", tag );
+    warn( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
   }
 }
 
+static void
+recv_request( const messenger_context_handle *handle,
+              uint16_t tag, void *data, size_t len ) {
+  debug( "%s: %#x", __func__, (unsigned int)tag );
+  switch ( tag ) {
+  case TD_MSGTYPE_PING_REQUEST:
+    // ping: topology service -> libtopology
+    recv_ping_request( handle, data, len );
+    break;
+
+  default:
+    warn( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
+  }
+}
 
 static void
 check_transaction_table( void *user_data ) {
   hash_table *transaction_table = user_data;
 
+  // TODO implement client -> server heart beat check here?
+
   hash_iterator iter;
   init_hash_iterator( transaction_table, &iter );
   hash_entry *e;
-  while (( e = iterate_hash_next( &iter ) ) != NULL ) {
+  while ( ( e = iterate_hash_next( &iter ) ) != NULL ) {
     struct send_request_param *param = e->value;
-    warn( "Outstanding transaction still remains: %#x", param->transaction_id );
-    warn( " message type is %u", param->message_type );
+    debug( "Outstanding transaction still remains: %#x", param->transaction_id );
+    debug( " message type is %#x", param->message_type );
     char buf[ 32 ];
-    warn( " called at %s", ctime_r( ( time_t * ) &param->called_at.tv_sec, buf ) );
+    debug( " called at %s", ctime_r( ( time_t * ) &param->called_at.tv_sec, buf ) );
   }
 }
 
@@ -375,18 +543,38 @@ init_libtopology( const char *service_name ) {
     return false;
   }
 
-  topology_name = xstrdup( service_name );
+  const size_t server_name_len = strlen( service_name ) + strlen( ".t" ) + 1;
+  if ( server_name_len > MESSENGER_SERVICE_NAME_LENGTH ) {
+    die( "Service name too long to create topology service name ( %s ).", service_name );
+  }
+  topology_name = xcalloc( 1, server_name_len );
+  snprintf( topology_name, server_name_len, "%s.t", service_name );
 
-  const size_t name_len = strlen( service_name ) + strlen( "-client-4294967295" ) + 1;
-  libtopology_queue_name = xcalloc( 1, name_len );
-  snprintf( libtopology_queue_name, name_len, "%s-client-%d",
+  const size_t client_name_len = strlen( service_name ) + strlen( "-c-4294967295" ) + 1;
+  if ( client_name_len > MESSENGER_SERVICE_NAME_LENGTH ) {
+    die( "Service name too long to create topology client name ( %s ).", service_name );
+  }
+  libtopology_queue_name = xcalloc( 1, client_name_len );
+  snprintf( libtopology_queue_name, client_name_len, "%s-c-%d",
             service_name, getpid() );
 
+  add_message_requested_callback( libtopology_queue_name, recv_request );
   add_message_replied_callback( libtopology_queue_name, recv_reply );
   add_message_received_callback( libtopology_queue_name, recv_status_notification );
 
   transaction_table = create_hash( compare_uint32, hash_uint32 );
   add_periodic_event_callback( 60, check_transaction_table, transaction_table );
+
+  return true;
+}
+
+bool
+add_callback_switch_status_updated( void ( *callback )( void *user_data,
+                                                           const topology_switch_status *link_status ),
+                                                           void *user_data ) {
+
+  switch_status_updated_callback = callback;
+  switch_status_updated_callback_param = user_data;
 
   return true;
 }
@@ -414,15 +602,38 @@ add_callback_link_status_updated(
 }
 
 
+static void
+free_all_transaction_table( void *key, void *value, void *user_data ) {
+  UNUSED( key );
+  UNUSED( user_data );
+  xfree( value );
+}
+
+
 bool
 finalize_libtopology() {
+  if ( topology_name == NULL || libtopology_queue_name == NULL ) {
+    debug( "already finalized" );
+    return false;
+  }
   xfree( topology_name );
   topology_name = NULL;
+
   delete_message_received_callback( libtopology_queue_name, recv_status_notification );
   delete_message_replied_callback( libtopology_queue_name, recv_reply );
+  delete_message_requested_callback( libtopology_queue_name, recv_request );
+
   xfree( libtopology_queue_name );
   libtopology_queue_name = NULL;
+
   delete_timer_event( check_transaction_table, transaction_table );
+
+  assert( transaction_table != NULL );
+  if( transaction_table->length > 0 ) {
+    debug( "%u outstanding transaction left.", transaction_table->length );
+    check_transaction_table( transaction_table );
+    foreach_hash( transaction_table, free_all_transaction_table, NULL );
+  }
   delete_hash( transaction_table );
   transaction_table = NULL;
 
@@ -433,33 +644,27 @@ finalize_libtopology() {
 bool
 get_all_link_status( void ( *callback )(), void *user_data ) {
   // send request message
-  send_request( TD_MSGTYPE_QUERY_LINK_STATUS, callback, user_data );
-  return true;
+  return send_request( TD_MSGTYPE_QUERY_LINK_STATUS_REQUEST, callback, user_data );
 }
 
 
 bool
 get_all_port_status( void ( *callback )(), void *user_data ) {
   // send request message
-  send_request( TD_MSGTYPE_QUERY_PORT_STATUS, callback, user_data );
-  return true;
+  return send_request( TD_MSGTYPE_QUERY_PORT_STATUS_REQUEST, callback, user_data );
 }
 
 
 bool
 get_all_switch_status( void ( *callback )(), void *user_data ) {
   // send request message
-  send_request( TD_MSGTYPE_QUERY_SWITCH_STATUS, callback, user_data );
-  return true;
+  return send_request( TD_MSGTYPE_QUERY_SWITCH_STATUS_REQUEST, callback, user_data );
 }
 
 
 bool
 set_link_status( const topology_update_link_status *link_status,
-                 void ( *callback )( void *user_data ), void *user_data ) {
-  UNUSED( link_status );
-  UNUSED( callback );
-  UNUSED( user_data );
+                 void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
   // send request message
   return send_update_link_status( link_status, callback, user_data );
 }
