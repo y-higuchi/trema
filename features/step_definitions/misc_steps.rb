@@ -68,6 +68,11 @@ Then /^([^\s]*) is started$/ do | name |
 end
 
 
+Given /^env TREMA_HOME is set$/ do
+  ENV['TREMA_HOME'] = Trema::HOME
+end
+
+
 ### Local variables:
 ### mode: Ruby
 ### coding: utf-8-unix
