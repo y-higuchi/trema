@@ -248,10 +248,12 @@ describe Switch do
   
   it "should be serializable to human readable form by to_s" do
     s = Switch[ { :dpid => 0x1234, :magic => 42 } ]
+    s.add_port Port[ { :dpid => 0x1234, :portno => 42, :up => true } ]
     s.add_outbound_link Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :not_used => 1 } ]
     s.add_inbound_link Link[ {:from_dpid => 0xABCD, :from_portno => 102, :to_dpid => 0x1234, :to_portno => 42, :not_used => 1 } ]
     s.to_s.should == <<-EOS
 Switch 0x1234 - [[:magic, 42]]
+ Port 0x1234:42 - [[:up, true]]
  Links_in
   <= 0xabcd:102
  Links_out
