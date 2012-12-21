@@ -61,7 +61,7 @@ switch_status_to_hash( const topology_switch_status* sw_status ) {
   VALUE sw = rb_hash_new();
   rb_hash_aset( sw, ID2SYM( rb_intern( "dpid" ) ), ULL2NUM( sw_status->dpid ) );
   rb_hash_aset( sw, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)sw_status->status ) );
-  // TODO document the definition of Switch "up" state
+
   if( sw_status->status == TD_SWITCH_UP ) {
     rb_hash_aset( sw, ID2SYM( rb_intern( "up" ) ), Qtrue );
   } else {
@@ -88,7 +88,7 @@ static VALUE
 port_status_to_hash( const topology_port_status* port_status ) {
   VALUE port = rb_hash_new();
   rb_hash_aset( port, ID2SYM( rb_intern( "dpid" ) ), ULL2NUM( port_status->dpid ) );
-  // TODO document warning about name difference. port_no in C, portno in Ruby
+
   rb_hash_aset( port, ID2SYM( rb_intern( "portno" ) ), INT2FIX( (int)port_status->port_no ) );
   rb_hash_aset( port, ID2SYM( rb_intern( "name" ) ), rb_str_new2( port_status->name ) );
   char macaddr[] = "FF:FF:FF:FF:FF:FF";
@@ -97,7 +97,7 @@ port_status_to_hash( const topology_port_status* port_status ) {
   rb_hash_aset( port, ID2SYM( rb_intern( "mac" ) ), rb_str_new2( macaddr ) );
   rb_hash_aset( port, ID2SYM( rb_intern( "external" ) ), INT2FIX( (int)port_status->external ) );
   rb_hash_aset( port, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)port_status->status ) );
-  // TODO document the definition of Port "up" state
+
   if ( port_status->status == TD_PORT_UP ) {
     rb_hash_aset( port, ID2SYM( rb_intern( "up" ) ), Qtrue );
   } else {
@@ -128,7 +128,7 @@ link_status_to_hash( const topology_link_status* link_status ) {
   rb_hash_aset( link, ID2SYM( rb_intern( "to_dpid" ) ), ULL2NUM( link_status->to_dpid ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "to_portno" ) ), INT2FIX( (int)link_status->to_portno ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)link_status->status ) );
-  // TODO document the definition of Link "up" state
+
   if( link_status->status != TD_LINK_DOWN ) {
     rb_hash_aset( link, ID2SYM( rb_intern( "up" ) ), Qtrue );
   } else {
@@ -228,7 +228,6 @@ static void
 handle_enable_topology_discovery_reply( void* self, const topology_response *res ) {
   if( res->status != TD_RESPONSE_OK ){
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
-    // FIXME Should failure of enable_topology_discovery notified to Ruby side?
     return;
   }
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "topology_discovery_ready" ) ) == Qtrue ) {
@@ -253,10 +252,8 @@ handle_disable_topology_discovery_reply( void* self, const topology_response *re
   UNUSED( self );
   if( res->status != TD_RESPONSE_OK ){
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
-    // TODO Should failure of disable_topology_discovery notified to Ruby side?
     return;
   }
-  // TODO Should successful disable_topology_discovery call be notified to Ruby side?
 }
 
 /**
@@ -432,6 +429,25 @@ topology_send_all_switch_status( VALUE self ) {
 
 void Init_topology( void ) {
   mTopology = rb_define_module_under( mTrema, "Topology" );
+
+  // @!group enum topology_switch_status_type
+  rb_define_const( mTopology, "TD_SWITCH_DOWN", TD_SWITCH_DOWN );
+  rb_define_const( mTopology, "TD_SWITCH_UP", TD_SWITCH_UP );
+
+  // @!group enum topology_port_status_type
+  rb_define_const( mTopology, "TD_PORT_DOWN", TD_PORT_DOWN );
+  rb_define_const( mTopology, "TD_PORT_UP", TD_PORT_UP );
+  // @!group enum topology_port_external_type
+  rb_define_const( mTopology, "TD_PORT_INACTIVE", TD_PORT_INACTIVE );
+  rb_define_const( mTopology, "TD_PORT_EXTERNAL", TD_PORT_EXTERNAL );
+
+  // @!group enum topology_link_status_type
+  rb_define_const( mTopology, "TD_LINK_DOWN", TD_LINK_DOWN );
+  rb_define_const( mTopology, "TD_LINK_UP", TD_LINK_UP );
+  rb_define_const( mTopology, "TD_LINK_UNSTABLE", TD_LINK_UNSTABLE );
+
+  // @!endgroup
+
   rb_define_protected_method( mTopology, "init_libtopology", topology_init_libtopology, 1 );
   rb_define_protected_method( mTopology, "finalize_libtopology", topology_finalize_libtopology, 0 );
 
