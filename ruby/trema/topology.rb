@@ -101,7 +101,7 @@ module Trema
     # @option link_stat [Integer] :to_dpid dpid of the switch which the link arraives
     # @option link_stat [Integer] :to_portno port number of the switch which the link arrives
     # @option link_stat [Integer] :status status of the link. Refer to enum topology_link_status_type in topology_service_interface.h
-    # @option link_stat [Boolean] :up true if status is NOT TD_LINK_DOWN, false otherwise.
+    # @option link_stat [Boolean] :up true if status is *NOT* TD_LINK_DOWN, false otherwise.
     # @option link_stat [Boolean] :unstable true if status is TD_LINK_UNSTABLE, false otherwise.
     # TODO define constants which corresponds to enum topology_link_status_type.
     #
@@ -111,34 +111,37 @@ module Trema
     
     #
     # @!method all_switch_status_reply( sw_stats )
-    # Event handler for send_all_switch_status_request reply event.
+    # Event handler used for send_all_switch_status_request reply event,
+    # if handler block was omitted on send_all_port_status_request call.
     # @abstract get_all_switch_status callback handler. Override this to implement a custom handler.
     #
     # @param [Array<Hash>] sw_stats
     #   Array of Hash containing info about updated switch.
-    # TODO Add param description
+    # @see #switch_status_updated Each Hash instance included in the array is equivalent to #switch_status_updated argument Hash.
     #
     handler :all_switch_status_reply
 
     #
     # @!method all_port_status_reply( port_stats )
-    # Event handler for send_all_port_status_request reply event.
+    # Event handler used for send_all_port_status_request reply event,
+    # if handler block was omitted on send_all_port_status_request call.
     # @abstract get_all_port_status callback handler. Override this to implement a custom handler.
     #
     # @param [Array<Hash>] port_stats
     #   Array of Hash containing info about updated port.
-    # TODO Add param description
+    # @see #port_status_updated Each Hash instance included in the array is equivalent to port_status_updated argument Hash.
     #
     handler :all_port_status_reply
 
     #
     # @!method all_link_status_reply( link_stat )
-    # Event handler for send_all_link_status_request reply event.
+    # Event handler used for send_all_link_status_request reply event, 
+    # if handler block was omitted on send_all_link_status_request call.
     # @abstract get_all_link_status call handler. Override this to implement a custom handler.
     #
     # @param [Array<Hash>] link_stat
     #   Array of Hash containing info about updated link.
-    # TODO Add param description
+    # @see #link_status_updated Each Hash instance included in the array is equivalent to link_status_updated argument Hash.
     #
     handler :all_link_status_reply
     

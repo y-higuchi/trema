@@ -34,7 +34,7 @@ module Trema
     TO_PORTNO = 3
   end
   
-  # module to add cached topology information capability to Controller
+  # A module to add topology information notification and cached topology capability to Controller
   #
   # @example
   #  class TestController < Controller
@@ -118,7 +118,7 @@ module Trema
     
     # Check if cache is ready to use.
     def cache_ready?
-      @all_link and @all_switch and @all_port
+      @all_link_received and @all_switch_received and @all_port_received
     end
     
     #
@@ -131,21 +131,31 @@ module Trema
     
     # 
     # Start rebuilding topology cache.
-    # cache_ready will be called on cache rebuild complete
-    # @note  send_all_\\{switch,link,port \\}_status_request will be called 
-    #  internally thus all_\\{switch,link,port \\}_status_reply 
-    #  event call back will be executed as a side-effect of this function call.
-    def send_rebuild_cache_request
+    # cache_ready will be called, when cache rebuild is complete
+    # @param [Boolean] clear_cache Clear cache before update.
+    def send_rebuild_cache_request clear_cache=true
       @need_cache_ready_notify = true
       @cache_up_to_date = false
-      @cache = Topology::Cache.new
-      @all_link = false
-      @all_switch = false
-      @all_port = false
+      @cache = Topology::Cache.new if clear_cache
+      @all_link_received = false
+      @all_switch_received = false
+      @all_port_received = false
       
-      send_all_switch_status_request
-      send_all_link_status_request
-      send_all_port_status_request
+      send_all_switch_status_request do |switches|
+        switches.each { |e| update_cache_by_switch_hash(e) }
+        @all_switch_received = true
+        notify_cache_ready() if @need_cache_ready_notify and cache_ready?
+      end
+      send_all_port_status_request do |ports|
+        ports.each { |e| update_cache_by_port_hash(e) }
+        @all_port_received = true
+        notify_cache_ready() if @need_cache_ready_notify and cache_ready?
+      end
+      send_all_link_status_request do |links|
+        links.each { |e| update_cache_by_link_hash(e) }
+        @all_link_received = true
+        notify_cache_ready() if @need_cache_ready_notify and cache_ready?
+      end
     end
     
     # Check if current cache is in latest state.
@@ -156,19 +166,19 @@ module Trema
     # @group Cache manual update operations
     
     # Call inside switch_status_updated handler to manually update cache to latest state
-    # @note cache will be automatically updated after handler exit if this method was not called.
+    # @note Cache will be automatically updated even if this method call was omitted.
     def update_cache_by_switch_hash sw
       _switch_status_updated sw
     end
 
     # Call inside link_status_updated handler to manually update cache to latest state
-    # @note cache will be automatically updated after handler exit if this method was not called.
+    # @note Cache will be automatically updated even if this method call was omitted.
     def update_cache_by_link_hash link
       _link_status_updated link
     end
 
     # Call inside port_status_updated handler to manually update cache to latest state
-    # @note cache will be automatically updated after handler exit if this method was not called.
+    # @note Cache will be automatically updated even if this method call was omitted.
     def update_cache_by_port_hash port
       _port_status_updated port
     end
@@ -177,39 +187,21 @@ module Trema
     protected
     ######################
     def _switch_status_updated sw
-      @cache = Topology::Cache.new unless @cache
+      @cache = Topology::Cache.new if not @cache
       @cache.update_switch_by_hash( sw )
       @cache_up_to_date = true
     end
 
     def _port_status_updated port
-      @cache = Topology::Cache.new unless @cache
+      @cache = Topology::Cache.new if not @cache
       @cache.update_port_by_hash( port )
       @cache_up_to_date = true
     end
 
     def _link_status_updated link
-      @cache = Topology::Cache.new unless @cache
+      @cache = Topology::Cache.new if not @cache
       @cache.update_link_by_hash( link )
       @cache_up_to_date = true
-    end
-
-    def _all_link_status_reply links
-      links.each { |e| _link_status_updated(e) }
-      @all_link = true
-      notify_cache_ready if @need_cache_ready_notify and cache_ready?
-    end
-
-    def _all_port_status_reply ports
-      ports.each { |e| _port_status_updated(e) }
-      @all_port = true
-      notify_cache_ready if @need_cache_ready_notify and cache_ready?
-    end
-
-    def _all_switch_status_reply switches
-      switches.each { |e| _switch_status_updated(e) }
-      @all_switch = true
-      notify_cache_ready if @need_cache_ready_notify and cache_ready?
     end
 
     # @private 
