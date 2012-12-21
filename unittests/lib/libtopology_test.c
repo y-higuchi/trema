@@ -1040,6 +1040,50 @@ test_respond_to_ping_from_topology() {
 
   finalize_timer();
   finalize_messenger();
+
+
+}
+
+static void
+test_struct_size() {
+  struct topology_update_link_status_unpack {
+    uint64_t from_dpid;
+    uint64_t to_dpid;
+    uint16_t from_portno;
+    uint16_t to_portno;
+    uint8_t status;       // enum topology_link_status_type
+  };
+  assert_int_equal( sizeof(topology_update_link_status), sizeof(struct topology_update_link_status_unpack) /*24*/ );
+
+//  struct topology_response_unpack {
+//    uint8_t status;       // enum topology_status_type
+//  };
+//  assert_int_equal( sizeof(topology_response), sizeof(struct topology_response_unpack) /*4*/ );
+
+  struct topology_link_status_unpack {
+    uint64_t from_dpid;
+    uint64_t to_dpid;
+    uint16_t from_portno;
+    uint16_t to_portno;
+    uint8_t status;       // enum topology_link_status_type
+  };
+  assert_int_equal( sizeof(topology_link_status), sizeof(struct topology_link_status_unpack) /*24*/ );
+
+  struct topology_port_status_unpack {
+    uint64_t dpid;
+    uint16_t port_no;
+    char name[ OFP_MAX_PORT_NAME_LEN ];
+    uint8_t mac[ ETH_ADDRLEN ];
+    uint8_t external;     // enum topology_port_external_type
+    uint8_t status;       // enum topology_port_status_type
+  };
+  assert_int_equal( sizeof(topology_port_status), sizeof(struct topology_port_status_unpack) /*40*/ );
+
+  struct topology_switch_status_unpack {
+    uint64_t dpid;
+    uint8_t status;       // enum topology_switch_status_type
+  };
+  assert_int_equal( sizeof(topology_switch_status), sizeof(struct topology_switch_status_unpack) /*16*/ );
 }
 
 /********************************************************************************
@@ -1049,6 +1093,7 @@ test_respond_to_ping_from_topology() {
 int
 main() {
   const UnitTest tests[] = {
+    unit_test( test_struct_size ),
     unit_test_setup_teardown( test_init_libtopology,
                               setup, teardown ),
     unit_test_setup_teardown( test_subscribe_topology,
