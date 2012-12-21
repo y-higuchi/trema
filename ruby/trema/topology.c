@@ -271,9 +271,26 @@ topology_disable_topology_discovery( VALUE self ) {
   return self;
 }
 
+
+typedef struct topology_callback {
+  VALUE self;
+  VALUE block;
+} topology_callback;
+
 static void
-handle_get_all_link_status_callback( void *self, size_t number, const topology_link_status *link_status ) {
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_link_status_reply" ) ) == Qtrue ) {
+handle_get_all_link_status_callback( void *tcb, size_t number, const topology_link_status *link_status ) {
+  topology_callback* cb = tcb;
+  VALUE self = cb->self;
+  VALUE block = cb->block;
+
+  if ( block != Qnil ){
+    VALUE links = rb_ary_new2( (long)number );
+    for( size_t i = 0 ; i < number ; ++i ){
+      VALUE link = link_status_to_hash( &link_status[i] );
+      rb_ary_push( links, link );
+    }
+    rb_funcall( block, rb_intern( "call" ), 1, links );
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_link_status_reply" ) ) == Qtrue ) {
     VALUE links = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE link = link_status_to_hash( &link_status[i] );
@@ -281,14 +298,7 @@ handle_get_all_link_status_callback( void *self, size_t number, const topology_l
     }
     rb_funcall( ( VALUE ) self, rb_intern( "all_link_status_reply" ), 1, links );
   }
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "_all_link_status_reply" ) ) == Qtrue ) {
-    VALUE links = rb_ary_new2( (long)number );
-    for( size_t i = 0 ; i < number ; ++i ){
-      VALUE link = link_status_to_hash( &link_status[i] );
-      rb_ary_push( links, link );
-    }
-    rb_funcall( ( VALUE ) self, rb_intern( "_all_link_status_reply" ), 1, links );
-  }
+  xfree( cb );
 }
 
 
@@ -296,17 +306,42 @@ handle_get_all_link_status_callback( void *self, size_t number, const topology_l
  *  @group Get all status requests
  *
  * Request Topology service to send all link status it holds.
- * Results will be returned as corresponding Get all status event.
+ * Results will be returned as callback to Block given,
+ * or as a call to all_link_status_reply handler if no Block was given.
+ *
+ * @yieldparam switches [Array<Hash>]  Array of Hash including current status.
+ *
+ * @see #link_status_updated Each Hash instance included in the array is equivalent to link_status_updated argument Hash.
+ * @see #all_link_status_reply
  */
 static VALUE
 topology_send_all_link_status( VALUE self ) {
-  get_all_link_status( handle_get_all_link_status_callback, (void*) self );
+  topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
+  cb->self = self;
+  if( rb_block_given_p() == Qtrue ) {
+    cb->block = rb_block_proc();
+  } else {
+    cb->block = Qnil;
+  }
+  get_all_link_status( handle_get_all_link_status_callback, (void*) cb );
   return self;
 }
 
+
 static void
-handle_get_all_port_status_callback( void *self, size_t number, const topology_port_status *port_status ) {
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_port_status_reply" ) ) == Qtrue ) {
+handle_get_all_port_status_callback( void *tcb, size_t number, const topology_port_status *port_status ) {
+  topology_callback* cb = tcb;
+  VALUE self = cb->self;
+  VALUE block = cb->block;
+
+  if ( block != Qnil ){
+    VALUE ports = rb_ary_new2( (long)number );
+    for( size_t i = 0 ; i < number ; ++i ){
+      VALUE port = port_status_to_hash( &port_status[i] );
+      rb_ary_push( ports, port );
+    }
+    rb_funcall( block, rb_intern( "call" ), 1, ports );
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_port_status_reply" ) ) == Qtrue ) {
     VALUE ports = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE port = port_status_to_hash( &port_status[i] );
@@ -314,31 +349,49 @@ handle_get_all_port_status_callback( void *self, size_t number, const topology_p
     }
     rb_funcall( ( VALUE ) self, rb_intern( "all_port_status_reply" ), 1, ports );
   }
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "_all_port_status_reply" ) ) == Qtrue ) {
-    VALUE ports = rb_ary_new2( (long)number );
-    for( size_t i = 0 ; i < number ; ++i ){
-      VALUE port = port_status_to_hash( &port_status[i] );
-      rb_ary_push( ports, port );
-    }
-    rb_funcall( ( VALUE ) self, rb_intern( "_all_port_status_reply" ), 1, ports );
-  }
+  xfree( cb );
 }
+
 
 /**
  *  @group Get all status requests
  *
  * Request Topology service to send all port status it holds.
- * Results will be returned as corresponding Get all status event.
- */
+ * Results will be returned as callback to Block given,
+ * or as a call to all_port_status_reply handler if no Block was given.
+ *
+ * @yieldparam ports [Array<Hash>]  Array of Hash including current status.
+ *
+ * @see #port_status_updated Each Hash instance included in the array is equivalent to port_status_updated argument Hash.
+ * @see #all_port_status_reply */
 static VALUE
 topology_send_all_port_status( VALUE self ) {
-  get_all_port_status( handle_get_all_port_status_callback, (void*) self );
+  topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
+  cb->self = self;
+  if( rb_block_given_p() == Qtrue ) {
+    cb->block = rb_block_proc();
+  } else {
+    cb->block = Qnil;
+  }
+  get_all_port_status( handle_get_all_port_status_callback, (void*) cb );
   return self;
 }
 
+
 static void
-handle_get_all_switch_status_callback( void *self, size_t number, const topology_switch_status *sw_status ) {
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_switch_status_reply" ) ) == Qtrue ) {
+handle_get_all_switch_status_callback( void *tcb, size_t number, const topology_switch_status *sw_status ) {
+  topology_callback* cb = tcb;
+  VALUE self = cb->self;
+  VALUE block = cb->block;
+
+  if ( block != Qnil ){
+    VALUE switches = rb_ary_new2( (long)number );
+    for( size_t i = 0 ; i < number ; ++i ){
+      VALUE sw = switch_status_to_hash( &sw_status[i] );
+      rb_ary_push( switches, sw );
+    }
+    rb_funcall( block, rb_intern( "call" ), 1, switches );
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_switch_status_reply" ) ) == Qtrue ) {
     VALUE switches = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE sw = switch_status_to_hash( &sw_status[i] );
@@ -346,28 +399,36 @@ handle_get_all_switch_status_callback( void *self, size_t number, const topology
     }
     rb_funcall( ( VALUE ) self, rb_intern( "all_switch_status_reply" ), 1, switches );
   }
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "_all_switch_status_reply" ) ) == Qtrue ) {
-     VALUE switches = rb_ary_new2( (long)number );
-     for( size_t i = 0 ; i < number ; ++i ){
-       VALUE sw = switch_status_to_hash( &sw_status[i] );
-       rb_ary_push( switches, sw );
-     }
-     rb_funcall( ( VALUE ) self, rb_intern( "_all_switch_status_reply" ), 1, switches );
-   }
+  xfree( cb );
 }
 
 
 /**
  *  @group Get all status requests
  *
+ * @!method send_all_switch_status_request { |switches| ... } | nil
  * Request Topology service to send all switch status it holds.
- * Results will be returned as corresponding Get all status event.
+ * Results will be returned as callback to Block given,
+ * or as a call to all_switch_status_reply handler if no Block was given.
+ *
+ * @yieldparam switches [Array<Hash>]  Array of Hash including current status.
+ *
+ * @see #switch_status_updated Each Hash instance included in the array is equivalent to switch_status_updated argument Hash.
+ * @see #all_switch_status_reply
  */
 static VALUE
 topology_send_all_switch_status( VALUE self ) {
-  get_all_switch_status( handle_get_all_switch_status_callback, (void*) self );
+  topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
+  cb->self = self;
+  if( rb_block_given_p() == Qtrue ) {
+    cb->block = rb_block_proc();
+  } else {
+    cb->block = Qnil;
+  }
+  get_all_switch_status( handle_get_all_switch_status_callback, (void*) cb );
   return self;
 }
+
 
 void Init_topology( void ) {
   mTopology = rb_define_module_under( mTrema, "Topology" );
