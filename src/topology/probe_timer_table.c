@@ -321,18 +321,6 @@ probe_request( probe_timer_entry *entry, int event, uint64_t *dpid, uint16_t por
 }
 
 
-static inline void
-timespec_sub( const struct timespec *a, const struct timespec *b,
-              struct timespec *result ) {
-  result->tv_sec = a->tv_sec - b->tv_sec;
-  result->tv_nsec = a->tv_nsec - b->tv_nsec;
-  if ( result->tv_nsec < 0 ) {
-    result->tv_sec--;
-    result->tv_nsec += 1000000000;
-  }
-}
-
-
 static void interval_timer_event( void *user_data );
 
 
