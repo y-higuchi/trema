@@ -243,6 +243,12 @@ test_probe_timer_entry_manipulation() {
   e3->expires.tv_sec = 2;
   e3->expires.tv_nsec = 300;
 
+  uint64_t dpid4 = 0x4;
+  uint8_t mac4[ETH_ADDRLEN] = { 0x04,0x04,0x04,0x04,0x04,0x04 };
+  probe_timer_entry* e4 = allocate_probe_timer_entry( &dpid4, 4, mac4 );
+  e4->expires.tv_sec = 2;
+  e4->expires.tv_nsec = 4;
+
 
   insert_probe_timer_entry( e2 );
   assert_true( probe_timer_table->next->data == e2 );
@@ -256,6 +262,11 @@ test_probe_timer_entry_manipulation() {
   probe_timer_entry* le3 = lookup_probe_timer_entry( &dpid3, 3 );
   assert_true( le3 == e3 );
 
+  insert_probe_timer_entry( e4 );
+  assert_true( probe_timer_table->next->data == e4 );
+  assert_true( probe_timer_last->data == e3 );
+  probe_timer_entry* le4 = lookup_probe_timer_entry( &dpid4, 4 );
+  assert_true( le4 == e4 );
 
   insert_probe_timer_entry( e1 );
   assert_true( probe_timer_table->next->data == e1 );
@@ -265,9 +276,9 @@ test_probe_timer_entry_manipulation() {
 
   assert_true( is_probe_timer_table_sorted_in_increasing_order() );
 
-  uint64_t dpid4 = 0x4;
-  assert_true( lookup_probe_timer_entry( &dpid4, 4 ) == NULL );
-  assert_true( delete_probe_timer_entry( &dpid4, 4 ) == NULL );
+  uint64_t dpid5 = 0x5;
+  assert_true( lookup_probe_timer_entry( &dpid5, 5 ) == NULL );
+  assert_true( delete_probe_timer_entry( &dpid5, 5 ) == NULL );
 
 
   probe_timer_entry* de2 = delete_probe_timer_entry( &dpid2, 2 );
@@ -277,6 +288,10 @@ test_probe_timer_entry_manipulation() {
   assert_true( is_probe_timer_table_sorted_in_increasing_order() );
 
   probe_timer_entry* de1 = delete_probe_timer_entry( &dpid1, 1 );
+  assert_true( probe_timer_table->next->data == e4 );
+  assert_true( probe_timer_last->data == e3 );
+
+  probe_timer_entry* de4 = delete_probe_timer_entry( &dpid4, 4 );
   assert_true( probe_timer_table->next->data == e3 );
   assert_true( probe_timer_last->data == e3 );
 
@@ -288,6 +303,7 @@ test_probe_timer_entry_manipulation() {
   free_probe_timer_entry( de1 );
   free_probe_timer_entry( de2 );
   free_probe_timer_entry( de3 );
+  free_probe_timer_entry( de4 );
 }
 
 
@@ -382,7 +398,7 @@ test_probe_request_send_delay_event_timeout_then_wait_and_sendlldp_fail() {
   probe_timer_entry* e = allocate_probe_timer_entry( &dpid, 1, mac );
 
   e->state = PROBE_TIMER_STATE_SEND_DELAY;
-  e->retry_count = 2;
+  e->retry_count = 0;
   assert_int_equal( e->state, PROBE_TIMER_STATE_SEND_DELAY );
 
   // detect lldp
@@ -545,7 +561,7 @@ test_probe_request_wait_event_timeout_then_wait_and_send_lldp_fail_if_retry_posi
 
   probe_request( e, PROBE_TIMER_EVENT_TIMEOUT, NULL, 0 );
   assert_int_equal( e->state, PROBE_TIMER_STATE_WAIT );
-  assert_true( e->retry_count > 0 );
+  assert_true( e->retry_count == 2 );
   assert_true( delete_probe_timer_entry( &e->datapath_id, e->port_no ) != NULL );
 
   // cleanup
@@ -572,6 +588,36 @@ test_probe_request_wait_event_timeout_then_confirm_and_set_link_if_retry_zero() 
   expect_value( mock_set_discovered_link_status, to_portno, 72 );
   expect_value( mock_set_discovered_link_status, status, TD_LINK_UNSTABLE );
   will_return( mock_set_discovered_link_status, TD_RESPONSE_OK );
+
+  probe_request( e, PROBE_TIMER_EVENT_TIMEOUT, NULL, 0 );
+  assert_int_equal( e->state, PROBE_TIMER_STATE_CONFIRMED );
+  assert_true( e->retry_count > 0 );
+  assert_true( delete_probe_timer_entry( &e->datapath_id, e->port_no ) != NULL );
+
+  // cleanup
+  free_probe_timer_entry( e );
+}
+
+static void
+test_probe_request_wait_event_timeout_then_confirm_and_set_link_fail_if_retry_zero() {
+  // other case
+  uint64_t dpid = 0x1234;
+  uint8_t mac[ETH_ADDRLEN] = { 0x01,0x01,0x01,0x01,0x01,0x01 };
+  probe_timer_entry* e = allocate_probe_timer_entry( &dpid, 42, mac );
+
+  e->retry_count = 1;
+  e->state = PROBE_TIMER_STATE_WAIT;
+  e->link_up = false;
+  e->to_datapath_id = 0x5678;
+  e->to_port_no = 72;
+  assert_int_equal( e->state, PROBE_TIMER_STATE_WAIT );
+
+  expect_value( mock_set_discovered_link_status, from_dpid, 0x1234 );
+  expect_value( mock_set_discovered_link_status, to_dpid, 0x5678 );
+  expect_value( mock_set_discovered_link_status, from_portno, 42 );
+  expect_value( mock_set_discovered_link_status, to_portno, 72 );
+  expect_value( mock_set_discovered_link_status, status, TD_LINK_DOWN );
+  will_return( mock_set_discovered_link_status, TD_RESPONSE_INVALID );
 
   probe_request( e, PROBE_TIMER_EVENT_TIMEOUT, NULL, 0 );
   assert_int_equal( e->state, PROBE_TIMER_STATE_CONFIRMED );
@@ -780,7 +826,7 @@ main() {
       unit_test_setup_teardown( test_allocate_and_free_probe_timer_entry, setup, teardown ),
       unit_test_setup_teardown( test_probe_timer_entry_manipulation, setup, teardown ),
 
-      // TODO probe request state transition
+      // probe request state transition
       unit_test_setup_teardown( test_probe_request_inactive_event_up_then_send_delay, setup_timer_event_off, teardown_timer_event_off ),
       unit_test_setup_teardown( test_probe_request_inactive_event_other_then_inactive, setup_timer_event_off, teardown_timer_event_off ),
 
@@ -795,6 +841,7 @@ main() {
       unit_test_setup_teardown( test_probe_request_wait_event_timeout_then_wait_and_send_lldp_if_retry_positive, setup_timer_event_off, teardown_timer_event_off ),
       unit_test_setup_teardown( test_probe_request_wait_event_timeout_then_wait_and_send_lldp_fail_if_retry_positive, setup_timer_event_off, teardown_timer_event_off ),
       unit_test_setup_teardown( test_probe_request_wait_event_timeout_then_confirm_and_set_link_if_retry_zero, setup_timer_event_off, teardown_timer_event_off ),
+      unit_test_setup_teardown( test_probe_request_wait_event_timeout_then_confirm_and_set_link_fail_if_retry_zero, setup_timer_event_off, teardown_timer_event_off ),
       unit_test_setup_teardown( test_probe_request_wait_event_up_then_wait, setup_timer_event_off, teardown_timer_event_off ),
 
       unit_test_setup_teardown( test_probe_request_confirmed_event_down_then_inactive, setup_timer_event_off, teardown_timer_event_off ),
