@@ -1046,8 +1046,9 @@ test_respond_to_ping_from_topology() {
 
 static void
 test_struct_size() {
+
   struct topology_update_link_status_unpack {
-    uint64_t from_dpid;
+    uint64_t from_dpid __attribute__(( aligned(8) ));
     uint64_t to_dpid;
     uint16_t from_portno;
     uint16_t to_portno;
@@ -1055,13 +1056,13 @@ test_struct_size() {
   };
   assert_int_equal( sizeof(topology_update_link_status), sizeof(struct topology_update_link_status_unpack) /*24*/ );
 
-//  struct topology_response_unpack {
-//    uint8_t status;       // enum topology_status_type
-//  };
-//  assert_int_equal( sizeof(topology_response), sizeof(struct topology_response_unpack) /*4*/ );
+  struct topology_response_unpack {
+    uint8_t status __attribute__(( aligned(4) ));;       // enum topology_status_type
+  };
+  assert_int_equal( sizeof(topology_response), sizeof(struct topology_response_unpack) /*4*/ );
 
   struct topology_link_status_unpack {
-    uint64_t from_dpid;
+    uint64_t from_dpid __attribute__(( aligned(8) ));
     uint64_t to_dpid;
     uint16_t from_portno;
     uint16_t to_portno;
@@ -1070,7 +1071,7 @@ test_struct_size() {
   assert_int_equal( sizeof(topology_link_status), sizeof(struct topology_link_status_unpack) /*24*/ );
 
   struct topology_port_status_unpack {
-    uint64_t dpid;
+    uint64_t dpid __attribute__(( aligned(8) )); // Force alignment to match 64bit env.
     uint16_t port_no;
     char name[ OFP_MAX_PORT_NAME_LEN ];
     uint8_t mac[ ETH_ADDRLEN ];
@@ -1080,7 +1081,7 @@ test_struct_size() {
   assert_int_equal( sizeof(topology_port_status), sizeof(struct topology_port_status_unpack) /*40*/ );
 
   struct topology_switch_status_unpack {
-    uint64_t dpid;
+    uint64_t dpid __attribute__(( aligned(8) )); // Force alignment to match 64bit env.
     uint8_t status;       // enum topology_switch_status_type
   };
   assert_int_equal( sizeof(topology_switch_status), sizeof(struct topology_switch_status_unpack) /*16*/ );
