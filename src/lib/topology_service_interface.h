@@ -124,11 +124,11 @@ enum topology_link_status_type {
 typedef struct topology_port_status {
   uint64_t dpid;
   uint16_t port_no;
+  uint8_t pad[ 6 ];     // Force 8 byte alignment. 6 = 8 - (2+16+6+1+1)%8
   char name[ OFP_MAX_PORT_NAME_LEN ];
   uint8_t mac[ ETH_ADDRLEN ];
   uint8_t external;     // enum topology_port_external_type
   uint8_t status;       // enum topology_port_status_type
-  uint8_t pad[ 6 ];     // 6 = 8 - (2+16+6+1+1)%8
 } __attribute__( ( packed ) ) topology_port_status;
 
 enum topology_port_status_type {
