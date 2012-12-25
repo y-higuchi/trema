@@ -20,18 +20,22 @@ module Trema
   module Topology
     class Link < Hash
       
+      # @return [Integer] datapath ID of the switch which this link departs from
       def from_dpid
         return self[:from_dpid]
       end
       
+      # @return [Integer] port number which this link departs from
       def from_portno
         return self[:from_portno]
       end
       
+      # @return [Integer] datapath ID of the switch which this link arrive to
       def to_dpid
         return self[:to_dpid]
       end
       
+      # @return [Integer] port number which this link departs arrive to
       def to_portno
         return self[:to_portno]
       end
@@ -43,7 +47,7 @@ module Trema
       
       # @return [String] Link key as a String
       def key_str
-        return "#{ from_dpid.to_s(16) }-#{ from_portno.to_s }-#{ to_dpid.to_s(16) }-#{ to_portno.to_s }"
+        return "L#{ from_dpid.to_s(16) }-#{ from_portno.to_s }-#{ to_dpid.to_s(16) }-#{ to_portno.to_s }"
       end
       
       # Link constructor.
