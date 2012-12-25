@@ -406,7 +406,7 @@ test_receive_port_add_status_then_notify_port_status() {
   port_entry *p4 = update_port_entry( sw, 4, "Port changed");
   p4->up = true;
 
-  // send fake feature_reply event to OFA I/F.
+  // send fake port_status event to OFA I/F.
   buffer* buf = alloc_buffer();
   openflow_service_header_t* ofs_header = append_back_buffer( buf, sizeof(openflow_service_header_t) );
   ofs_header->datapath_id = htonll( 0x1234 );
@@ -478,7 +478,7 @@ test_receive_port_del_status_then_notify_port_status() {
   port_entry *p4 = update_port_entry( sw, 4, "Port changed");
   p4->up = true;
 
-  // send fake feature_reply event to OFA I/F.
+  // send fake port_status event to OFA I/F.
   buffer* buf = alloc_buffer();
   openflow_service_header_t* ofs_header = append_back_buffer( buf, sizeof(openflow_service_header_t) );
   ofs_header->datapath_id = htonll( 0x1234 );
@@ -554,7 +554,7 @@ test_receive_port_mod_status_then_notify_port_status() {
   link_to* l = update_link_to( p4, &datapath_id, 2, true );
   assert_true( l != NULL );
 
-  // send fake feature_reply event to OFA I/F.
+  // send fake port_status event to OFA I/F.
   buffer* buf = alloc_buffer();
   openflow_service_header_t* ofs_header = append_back_buffer( buf, sizeof(openflow_service_header_t) );
   ofs_header->datapath_id = htonll( 0x1234 );
@@ -633,7 +633,7 @@ test_receive_port_mod_status_port_no_then_notify_port_status() {
   p4->up = true;
 
 
-  // send fake feature_reply event to OFA I/F.
+  // send fake port_status event to OFA I/F.
   buffer* buf = alloc_buffer();
   openflow_service_header_t* ofs_header = append_back_buffer( buf, sizeof(openflow_service_header_t) );
   ofs_header->datapath_id = htonll( 0x1234 );

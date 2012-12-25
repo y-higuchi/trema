@@ -137,7 +137,7 @@ module Trema
         @links_out.delete link.key
       end
       
-      # @param [Array(Integer, Integer, Integer, Integer)] Link key 4-tuple of the link to delete
+      # @param [Array(Integer, Integer, Integer, Integer)] key Link key 4-tuple of the link to delete
       def del_link_by_key key
         @links_in.delete key
         @links_out.delete key

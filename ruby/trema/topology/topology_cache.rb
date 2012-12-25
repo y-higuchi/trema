@@ -146,11 +146,13 @@ module Trema
         @all_switch_received = true
         notify_cache_ready() if @need_cache_ready_notify and cache_ready?
       end
+      
       send_all_port_status_request do |ports|
         ports.each { |e| update_cache_by_port_hash(e) }
         @all_port_received = true
         notify_cache_ready() if @need_cache_ready_notify and cache_ready?
       end
+      
       send_all_link_status_request do |links|
         links.each { |e| update_cache_by_link_hash(e) }
         @all_link_received = true

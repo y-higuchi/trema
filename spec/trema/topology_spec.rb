@@ -446,8 +446,6 @@ Link (0x1234:42)->(0x5678:72) - [[:not_used, 1]]
     end
   end
   
-
-  
 end
 
 ### Local variables:
