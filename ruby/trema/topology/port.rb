@@ -37,7 +37,7 @@ module Trema
       
       # @return [String] Port key as a String
       def key_str
-        return "#{ dpid.to_s(16) }-#{ portno.to_s }"
+        return "P#{ dpid.to_s(16) }-#{ portno.to_s }"
       end
       
       # Port constructor
