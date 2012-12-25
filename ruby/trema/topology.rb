@@ -67,7 +67,6 @@ module Trema
     # @option sw_stat [Integer] :dpid dpid of the switch
     # @option sw_stat [Integer] :status status of the switch. Refer to enum topology_switch_status_type in topology_service_interface.h
     # @option sw_stat [Boolean] :up true if status is TD_SWITCH_UP
-    # TODO define constants which corresponds to enum topology_switch_status_type.
     #
     handler :switch_status_updated
 
@@ -85,7 +84,6 @@ module Trema
     # @option port_stat [Integer] :external external flag of the port. Refer to enum topology_port_external_type in topology_service_interface.h
     # @option port_stat [Integer] :status status of the port. Refer to enum topology_port_status_type in topology_service_interface.h
     # @option port_stat [Boolean] :up true if status is TD_PORT_UP
-    # TODO define constants which corresponds to enum topology_port_status_type, topology_port_external_type.
     #
     handler :port_status_updated
     
@@ -103,7 +101,6 @@ module Trema
     # @option link_stat [Integer] :status status of the link. Refer to enum topology_link_status_type in topology_service_interface.h
     # @option link_stat [Boolean] :up true if status is *NOT* TD_LINK_DOWN, false otherwise.
     # @option link_stat [Boolean] :unstable true if status is TD_LINK_UNSTABLE, false otherwise.
-    # TODO define constants which corresponds to enum topology_link_status_type.
     #
     handler :link_status_updated
     
