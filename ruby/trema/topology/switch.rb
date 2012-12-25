@@ -39,7 +39,7 @@ module Trema
       
       # @return [String] Switch key as a String
       def key_str
-        return dpid.to_s(16)
+        return "S#{ dpid.to_s(16) }"
       end
       
       # Switch constructor.
@@ -97,7 +97,9 @@ module Trema
         @ports.delete( portno );
       end
       
-      # (see Port.[])
+      # Update port on this switch by Hash
+      # @param [Hash] port Hash containing info about updated port.
+      # @see Port.[]
       def update_port_by_hash port
         p = Port[ port ]
 
@@ -113,24 +115,29 @@ module Trema
         end
       end
       
+      # @param [Link] link inbound link to add.
       def add_inbound_link link
         raise ArgumentError, "Specified link is not a link to this switch" if link.to_dpid != self.dpid
         @links_in[ link.key ] = link
       end
       
+      # @param [Link] link outbound link to add.
       def add_outbound_link  link
         raise ArgumentError, "Specified link is not a link from this switch" if link.from_dpid != self.dpid
         @links_out[ link.key ] = link
       end
       
+      # @param [Link] link inbound link to delete.
       def del_inbound_link link
         @links_in.delete link.key
       end
       
+      # @param [Link] link outbound link to delete
       def del_outbound_link link
         @links_out.delete link.key
       end
       
+      # @param [Array(Integer, Integer, Integer, Integer)] Link key 4-tuple of the link to delete
       def del_link_by_key key
         @links_in.delete key
         @links_out.delete key
