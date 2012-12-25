@@ -55,6 +55,7 @@ module Trema
         @switches.delete dpid
       end
       
+      # Lookup a switch from Topology cache using dpid
       def lookup_switch_by_dpid dpid
         @switches[dpid]
       end
@@ -84,6 +85,7 @@ module Trema
         del_link_by_key_tuple [link.from_dpid, link.from_portno, link.to_dpid, link.to_portno ]
       end
       
+      # Delete a link from Topology cache.
       def del_link_by_key_elements from_dpid, from_portno, to_dpid, to_portno
         del_link_by_key_tuple [from_dpid, from_portno, to_dpid, to_portno ]
       end 
@@ -100,6 +102,7 @@ module Trema
         @links.delete( key )
       end
       
+      # Lookup a link from Topology cache.
       # @param [Hash] link look up a link instance using key elements listed in Options
       # @option (see Link.[])
       def lookup_link_by_hash link
