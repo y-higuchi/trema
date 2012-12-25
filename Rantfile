@@ -1048,6 +1048,9 @@ external_unittests = [
 
 desc "Run unittests"
 task :unittests => [ :build_old_unittests, :build_unittests ] do
+  sys.mkdir_p Trema.log
+  sys.mkdir_p Trema.pid
+  sys.mkdir_p Trema.sock
   ( sys[ "unittests/objects/*_test" ] + tests + external_unittests ).each do | each |
     puts "Running #{ each }..."
     sys each
