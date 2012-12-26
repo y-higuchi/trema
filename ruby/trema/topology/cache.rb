@@ -36,6 +36,7 @@ module Trema
       # @group Switch manipulation methods
       
       # Add a switch to topology cache.
+      # @return [Switch] Switch instance added.
       def add_switch sw
         raise TypeError, "Trema::Topology::Switch expected" if not sw.is_a?(Switch)
         @switches[ sw.dpid ] = sw;
@@ -56,8 +57,22 @@ module Trema
       end
       
       # Lookup a switch from Topology cache using dpid
+      # @param [Integer] dpid dpid of the switch to look for.
+      # @return [Switch,nil] Switch instance found, or nil if not found. 
       def lookup_switch_by_dpid dpid
         @switches[dpid]
+      end
+      
+      # Get a switch from Topology cache using dpid.
+      # Switch instance will be created if not found.
+      # @param [Integer] dpid dpid of the switch to look for.
+      # @return [Switch] Switch instance for specified dpid
+      def get_switch_for_dpid dpid
+        sw = lookup_switch_by_dpid dpid
+        if sw == nil then
+          sw = add_switch Switch[ { :dpid => dpid } ]
+        end
+        return sw
       end
       
       # @group Link manipulation methods
@@ -69,10 +84,8 @@ module Trema
         key.each { |e| e.freeze }
         key.freeze
         
-        sw_from = @switches[ link.from_dpid ]
-        sw_from = add_switch Switch[ { :dpid => link.from_dpid } ]  if sw_from == nil
-        sw_to = @switches[ link.to_dpid ]
-        sw_to = add_switch Switch[ { :dpid => link.to_dpid } ] if sw_to == nil
+        sw_from = get_switch_for_dpid link.from_dpid
+        sw_to = get_switch_for_dpid  link.to_dpid
         
         sw_from.add_outbound_link link
         sw_to.add_inbound_link link
@@ -117,7 +130,7 @@ module Trema
       # @param [Hash] sw switch instance info hash 
       # @option (see Switch.[])
       def update_switch_by_hash sw
-        raise ArgumentError, "Key element for Switch missing in Hash" unless sw.include? :dpid
+        raise ArgumentError, "Key element for Switch missing in Hash" if not Switch.has_keys?( sw )
         
         if sw[:up] then
           s = lookup_switch_by_dpid( sw[:dpid] )
@@ -136,12 +149,11 @@ module Trema
       # @param [Hash] link link instance info hash 
       # @option (see Link.[])
       def update_link_by_hash link
-        raise ArgumentError, "Key element for Link missing in Hash" if link.values_at(:from_dpid, :from_portno, :to_dpid, :to_portno).include? nil
+        raise ArgumentError, "Key element for Link missing in Hash" if not Link.has_keys?( link )
         
         if link[:up] then
           l = lookup_link_by_hash( link )
           if l != nil then
-            # link exist => update attributes
             l.update( link )
           else
             add_link Link[ link ]
@@ -156,7 +168,7 @@ module Trema
       # @param [Hash] port port instance info hash 
       # @option (see Port.[])
       def update_port_by_hash port
-        raise ArgumentError, "Key element for Port missing in Hash" if port.values_at(:dpid, :portno).include? nil
+        raise ArgumentError, "Key element for Port missing in Hash" if not Port.has_keys?( port )
         
         if port[:up] then
           s = lookup_switch_by_dpid( port[:dpid] )

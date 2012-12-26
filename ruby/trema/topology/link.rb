@@ -18,6 +18,7 @@
 
 module Trema
   module Topology
+    # A class to represent a link in a Topology 
     class Link < Hash
       
       # @return [Integer] datapath ID of the switch which this link departs from
@@ -60,7 +61,7 @@ module Trema
       # @example
       #   link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
       def Link.[]( link )
-        raise ArgumentError, "Key element for Link missing in Hash" if link.values_at(:from_dpid, :from_portno, :to_dpid, :to_portno).include? nil
+        raise ArgumentError, "Key element for Link missing in Hash" if not Link.has_keys?(link)
 
         link[:from_dpid].freeze
         link[:from_portno].freeze
@@ -73,6 +74,13 @@ module Trema
       # @return [Boolean] true if k is key element for Link
       def Link.is_key?( k )
         return (k == :from_dpid or k == :from_portno or k == :to_dpid or k == :to_portno)
+      end
+      
+      # Test if Hash has required key as a Link instance
+      # @param hash Hash to test 
+      # @return [Boolean] true if hash has all required keys.
+      def Link.has_keys?( hash )
+        return !(hash.values_at(:from_dpid, :from_portno, :to_dpid, :to_portno).include? nil)
       end
       
       # @private
