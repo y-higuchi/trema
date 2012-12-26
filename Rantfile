@@ -448,7 +448,7 @@ end
 topology_objects_dir = objects( "topology" )
 
 gen C::Dependencies, dependency( "topology" ),
-  :search => [ "src/topology", Trema.include ], :sources => sys[ "src/topology/*.c", "src/topology/*.h" ]
+  :search => [ "src/topology", Trema.include ], :sources => sys[ "src/topology/*.{c,h}" ]
 
 gen Action do
   source dependency( "topology" )
