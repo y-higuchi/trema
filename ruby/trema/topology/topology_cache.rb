@@ -142,19 +142,19 @@ module Trema
       @all_port_received = false
       
       send_all_switch_status_request do |switches|
-        switches.each { |e| update_cache_by_switch_hash(e) }
+        switches.each { |sw| update_cache_by_switch_hash(sw) }
         @all_switch_received = true
         notify_cache_ready() if @need_cache_ready_notify and cache_ready?
       end
       
       send_all_port_status_request do |ports|
-        ports.each { |e| update_cache_by_port_hash(e) }
+        ports.each { |port| update_cache_by_port_hash(port) }
         @all_port_received = true
         notify_cache_ready() if @need_cache_ready_notify and cache_ready?
       end
       
       send_all_link_status_request do |links|
-        links.each { |e| update_cache_by_link_hash(e) }
+        links.each { |link| update_cache_by_link_hash(link) }
         @all_link_received = true
         notify_cache_ready() if @need_cache_ready_notify and cache_ready?
       end
@@ -189,19 +189,19 @@ module Trema
     protected
     ######################
     def _switch_status_updated sw
-      @cache = Topology::Cache.new if not @cache
+      @cache ||= Topology::Cache.new
       @cache.update_switch_by_hash( sw )
       @cache_up_to_date = true
     end
 
     def _port_status_updated port
-      @cache = Topology::Cache.new if not @cache
+      @cache ||= Topology::Cache.new
       @cache.update_port_by_hash( port )
       @cache_up_to_date = true
     end
 
     def _link_status_updated link
-      @cache = Topology::Cache.new if not @cache
+      @cache ||= Topology::Cache.new
       @cache.update_link_by_hash( link )
       @cache_up_to_date = true
     end

@@ -54,15 +54,15 @@ module Trema
         raise ArgumentError, "Key element for Switch missing in Hash" if not Switch.has_keys?( sw )
 
         sw[:dpid].freeze
-        s = super( sw )
-        s.initialize_members
-        return s
+        new_instance = super( sw )
+        new_instance.initialize_members
+        return new_instance
       end
       
-      # @param k Hash key element
-      # @return [Boolean] true if k is key element for Switch
-      def Switch.is_key?( k )
-        return ( k == :dpid )
+      # @param key Hash key element
+      # @return [Boolean] true if key is key element for Switch
+      def Switch.is_key?( key )
+        return ( key == :dpid )
       end
       
       # Test if Hash has required key as a Switch instance
@@ -87,13 +87,13 @@ module Trema
       # @param [Port] port Port instance to add to switch
       def add_port port
         raise TypeError, "Trema::Topology::Port expected" if not port.is_a?(Port)
-        raise ArgumentError, "dpid mismatch. 0x#{ self.dpid.to_s(16) } expected but received: 0x#{ port.dpid.to_s(16) }" if (self.dpid != port.dpid)
-        @ports[port.portno] = port;
+        raise ArgumentError, "dpid mismatch. 0x#{ self.dpid.to_s(16) } expected but received: 0x#{ port.dpid.to_s(16) }" if ( self.dpid != port.dpid )
+        @ports[ port.portno ] = port
       end
       
       # @param [Integer] portno Create a Port instance and add to switch
       def add_port_by_portno portno
-        @ports[portno] = Port[ { :dpid => self.dpid, :portno => portno} ]
+        @ports[ portno ] = Port[ { :dpid => self.dpid, :portno => portno } ]
       end
       
       # @param [Port] port Port instance to delete from
@@ -110,17 +110,17 @@ module Trema
       # @param [Hash] port Hash containing info about updated port.
       # @see Port.[]
       def update_port_by_hash port
-        p = Port[ port ]
+        raise ArgumentError, "Key element for Port missing in Hash" if not Port.has_keys?( port )
 
-        if p[:up] then
-          portno = p[:portno]
+        portno = port[:portno]
+        if port[:up] then
           if @ports.include?( portno ) then
-            @ports[portno].update port
+            @ports[ portno ].update port
           else
-            add_port p
+            add_port Port[ port ]
           end
         else
-          @ports.delete( port[:portno] )
+          @ports.delete( portno )
         end
       end
       
@@ -153,16 +153,16 @@ module Trema
       end
       
       def to_s
-        s = "Switch 0x#{ dpid.to_s(16) } - #{ self.select {|k,v| !Switch.is_key?(k) }.inspect }\n"
-        @ports.each_pair do |key,val|
-          s << " #{val.to_s}\n"
+        s = "Switch 0x#{ dpid.to_s(16) } - #{ self.select {|key,_| !Switch.is_key?(key) }.inspect }\n"
+        @ports.each_pair do |_,val|
+          s << " #{ val.to_s }\n"
         end
         s << " Links_in\n" if not @links_in.empty?
-        @links_in.each_pair do |key,val|
+        @links_in.each_pair do |key,_|
           s << "  <= 0x#{ key[FROM_DPID].to_s(16) }:#{ key[FROM_PORTNO] }\n"
         end
         s << " Links_out\n" if not @links_out.empty?
-        @links_out.each_pair do |key,val|
+        @links_out.each_pair do |key,_|
           s << "  => 0x#{ key[ TO_DPID ].to_s(16) }:#{ key[ TO_PORTNO ] }\n"
         end
         return s

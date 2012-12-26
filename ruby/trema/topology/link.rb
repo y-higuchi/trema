@@ -70,10 +70,15 @@ module Trema
         super( link )
       end
       
-      # @param k Hash key element
-      # @return [Boolean] true if k is key element for Link
-      def Link.is_key?( k )
-        return (k == :from_dpid or k == :from_portno or k == :to_dpid or k == :to_portno)
+      # @param key Hash key element
+      # @return [Boolean] true if key is key element for Link
+      def Link.is_key?( key )
+        case key
+        when :from_dpid, :from_portno, :to_dpid, :to_portno
+          return true
+        else
+          return false
+        end
       end
       
       # Test if Hash has required key as a Link instance
@@ -89,7 +94,7 @@ module Trema
       end
       
       def to_s
-        "Link (0x#{ from_dpid.to_s(16) }:#{ from_portno.to_s })->(0x#{ to_dpid.to_s(16) }:#{ to_portno.to_s }) - #{ self.select {|k,v| !Link.is_key?(k) }.inspect }"
+        "Link (0x#{ from_dpid.to_s(16) }:#{ from_portno.to_s })->(0x#{ to_dpid.to_s(16) }:#{ to_portno.to_s }) - #{ self.select {|key,_| !Link.is_key?(key) }.inspect }"
       end
     end
   end

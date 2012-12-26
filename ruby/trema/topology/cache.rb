@@ -51,8 +51,8 @@ module Trema
       # Delete a switch from Topology cache using dpid
       # @see #del_switch
       def del_switch_by_dpid dpid
-        remove_links = @links.select { |k,v| (k[FROM_DPID] == dpid || k[TO_DPID] == dpid) }
-        remove_links.each { |l| self.del_link_by_key_tuple( l[0] ) }
+        remove_links = @links.select { |key,_| (key[FROM_DPID] == dpid || key[TO_DPID] == dpid) }
+        remove_links.each { |kv_pair| self.del_link_by_key_tuple( kv_pair[0] ) }
         @switches.delete dpid
       end
       
@@ -79,7 +79,7 @@ module Trema
       # @note Corresponding Switch object's links_out, links_in will also be updated.
       def add_link link
         key = link.key
-        key.each { |e| e.freeze }
+        key.each { |each| each.freeze }
         key.freeze
         
         sw_from = get_switch_for_dpid link.from_dpid
@@ -130,15 +130,16 @@ module Trema
       def update_switch_by_hash sw
         raise ArgumentError, "Key element for Switch missing in Hash" if not Switch.has_keys?( sw )
         
+        dpid = sw[:dpid]
         if sw[:up] then
-          s = lookup_switch_by_dpid( sw[:dpid] )
+          s = lookup_switch_by_dpid( dpid )
           if s != nil then
             s.update( sw )
           else
             add_switch Switch[ sw ]
           end
         else
-          del_switch_by_dpid sw[:dpid]
+          del_switch_by_dpid dpid
         end
       end
       
@@ -167,19 +168,12 @@ module Trema
       # @option (see Port.[])
       def update_port_by_hash port
         raise ArgumentError, "Key element for Port missing in Hash" if not Port.has_keys?( port )
-        
+        dpid = port[:dpid]
+        s = lookup_switch_by_dpid( dpid )
         if port[:up] then
-          s = lookup_switch_by_dpid( port[:dpid] )
-          if s == nil then
-            s = add_switch Switch[ {:dpid => port[:dpid]} ]
-          end
-          s.update_port_by_hash( port )
-        else
-          s = lookup_switch_by_dpid( port[:dpid] )
-          if s != nil then
-            s.update_port_by_hash( port )
-          end
+          s ||= add_switch Switch[ { :dpid => dpid } ]
         end
+        s.update_port_by_hash( port ) if s != nil
       end
       
       # @endgroup
@@ -187,11 +181,11 @@ module Trema
       def to_s
         s = "[Topology Cache]\n"
         s << "(Empty)\n" if @switches.empty? and @links.empty?
-        @switches.each_pair { |k,v|
-          s << v.to_s
-        }
-        @links.each_pair do |k,v|
-          s << "#{v.to_s}\n"
+        @switches.each_pair do |_, sw|
+          s << sw.to_s
+        end
+        @links.each_pair do |_, link|
+          s << "#{link.to_s}\n"
         end
         return s
       end
