@@ -56,10 +56,15 @@ module Trema
         super( port )
       end
 
-      # @param k Hash key element
-      # @return [Boolean] true if k is key element for Port
-      def Port.is_key?( k )
-        return (k == :dpid or k == :portno)
+      # @param key Hash key element
+      # @return [Boolean] true if key is key element for Port
+      def Port.is_key?( key )
+        case key
+        when :dpid, :portno
+          return true
+        else
+          return false
+        end
       end
       
       # Test if Hash has required key as a Port instance
@@ -75,7 +80,7 @@ module Trema
       end
 
       def to_s
-        "Port 0x#{ dpid.to_s(16) }:#{ portno.to_s } - #{ self.select {|k,v| !Port.is_key?(k) }.inspect }"
+        "Port 0x#{ dpid.to_s(16) }:#{ portno.to_s } - #{ self.select {|key,_| !Port.is_key?(key) }.inspect }"
       end
     end
   end
