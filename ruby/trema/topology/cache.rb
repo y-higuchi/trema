@@ -69,9 +69,7 @@ module Trema
       # @return [Switch] Switch instance for specified dpid
       def get_switch_for_dpid dpid
         sw = lookup_switch_by_dpid dpid
-        if sw == nil then
-          sw = add_switch Switch[ { :dpid => dpid } ]
-        end
+        sw ||= add_switch Switch[ { :dpid => dpid } ]
         return sw
       end
       
