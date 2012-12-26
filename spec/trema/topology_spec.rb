@@ -446,6 +446,65 @@ Link (0x1234:42)->(0x5678:72) - [[:not_used, 1]]
     end
   end
   
+  describe "Cache management functions" do
+    before do
+      class DummyController
+        include Topology
+      end
+      @c = DummyController.new
+    end
+    
+    it "should respond to get_cache, cache_ready?, cache_up_to_date?" do
+      @c.should respond_to( :get_cache, :cache_ready?, :cache_up_to_date? )
+    end
+    
+    it "should issue all status request on rebuild request" do
+      
+      @c.cache_up_to_date?.should be_false
+      
+      @c.should_receive(:send_all_switch_status_request).and_yield( [ {:dpid => 0x1234, :up => true } ] )
+      @c.should_receive(:send_all_port_status_request).and_yield( [ {:dpid => 0x1234, :portno => 42, :up => true } ] )
+      @c.should_receive(:send_all_link_status_request).and_yield( [ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => true } ] )
+      
+      @c.should_receive(:cache_ready).once
+      
+      @c.send_rebuild_cache_request
+      
+      @c.cache_up_to_date?.should be_true
+    end
+    
+    it "should update Cache on Switch update event" do
+      @c.update_cache_by_switch_hash( {:dpid => 0x1234, :up => true } )
+      cache = @c.get_cache
+      cache.lookup_switch_by_dpid( 0x1234 ).should_not be_nil 
+
+      @c.update_cache_by_switch_hash( {:dpid => 0x1234, :up => false } )
+      cache = @c.get_cache
+      cache.lookup_switch_by_dpid( 0x1234 ).should be_nil 
+    end
+    
+    it "should update Cache on Port update event" do
+      @c.update_cache_by_port_hash( {:dpid => 0x1234, :portno => 42, :up => true } )
+      cache = @c.get_cache
+      cache.lookup_switch_by_dpid( 0x1234 ).ports[42].should_not be_nil
+
+      @c.update_cache_by_port_hash( {:dpid => 0x1234, :portno => 42, :up => false } )
+      cache = @c.get_cache
+    cache.lookup_switch_by_dpid( 0x1234 ).ports[42].should be_nil
+    end
+    
+    it "should update Cache on Link update event" do
+      @c.update_cache_by_link_hash( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => true } )
+      cache = @c.get_cache
+      cache.lookup_link_by_hash( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ).should_not be_nil 
+
+      @c.update_cache_by_link_hash( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => false } )
+      cache = @c.get_cache
+      cache.lookup_link_by_hash( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ).should be_nil 
+    end
+    
+    
+  end
 end
 
 ### Local variables:
