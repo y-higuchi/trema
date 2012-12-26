@@ -18,6 +18,7 @@
 
 module Trema
   module Topology
+    # A class to represent a port in a Topology 
     class Port < Hash
       
       # @return [Integer] datapath ID of the switch which this port belong to.
@@ -48,7 +49,7 @@ module Trema
       # @example
       #   port = Port[ {:dpid => 1234, :portno => 42} ]
       def Port.[]( port ) 
-        raise ArgumentError, "Key element for Port missing in Hash" if port.values_at(:dpid, :portno).include? nil
+        raise ArgumentError, "Key element for Port missing in Hash" if not Port.has_keys?( port )
         
         port[ :dpid ].freeze
         port[ :portno ].freeze
@@ -59,6 +60,13 @@ module Trema
       # @return [Boolean] true if k is key element for Port
       def Port.is_key?( k )
         return (k == :dpid or k == :portno)
+      end
+      
+      # Test if Hash has required key as a Port instance
+      # @param hash Hash to test 
+      # @return [Boolean] true if hash has all required keys.
+      def Port.has_keys?( hash )
+        return !(hash.values_at(:dpid, :portno).include? nil)
       end
       
       # @private

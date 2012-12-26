@@ -18,6 +18,7 @@
 
 module Trema
   module Topology
+    # A class to represent a switch in a Topology 
     class Switch < Hash
       # Hash of Ports: port_no => Port
       # @note Manipulation of ports has no impact on topology. 
@@ -28,6 +29,7 @@ module Trema
       #       These hash will be updated through ToplogyCache methods.
       attr_reader :links_in, :links_out
       
+      # @return [Integer] Switch datapath ID for this Switch instance
       def dpid
         return self[:dpid]
       end
@@ -49,7 +51,7 @@ module Trema
       # @example
       #  sw = Switch[ {:dpid => 0x1234} ]
       def Switch.[]( sw )
-        raise ArgumentError, "Key element for Switch missing in Hash" unless sw.include? :dpid
+        raise ArgumentError, "Key element for Switch missing in Hash" if not Switch.has_keys?( sw )
 
         sw[:dpid].freeze
         s = super( sw )
@@ -61,6 +63,13 @@ module Trema
       # @return [Boolean] true if k is key element for Switch
       def Switch.is_key?( k )
         return ( k == :dpid )
+      end
+      
+      # Test if Hash has required key as a Switch instance
+      # @param hash Hash to test 
+      # @return [Boolean] true if hash has all required keys.
+      def Switch.has_keys?( hash )
+        return hash.has_key?( :dpid )
       end
       
       # @private
@@ -106,7 +115,7 @@ module Trema
         if p[:up] then
           portno = p[:portno]
           if @ports.include?( portno ) then
-            @ports[portno].update p
+            @ports[portno].update port
           else
             add_port p
           end
@@ -145,16 +154,16 @@ module Trema
       
       def to_s
         s = "Switch 0x#{ dpid.to_s(16) } - #{ self.select {|k,v| !Switch.is_key?(k) }.inspect }\n"
-        @ports.each_pair do |k,v|
-          s << " #{v.to_s}\n"
+        @ports.each_pair do |key,val|
+          s << " #{val.to_s}\n"
         end
         s << " Links_in\n" if not @links_in.empty?
-        @links_in.each_pair do |k,v|
-          s << "  <= 0x#{ k[FROM_DPID].to_s(16) }:#{ k[FROM_PORTNO] }\n"
+        @links_in.each_pair do |key,val|
+          s << "  <= 0x#{ key[FROM_DPID].to_s(16) }:#{ key[FROM_PORTNO] }\n"
         end
         s << " Links_out\n" if not @links_out.empty?
-        @links_out.each_pair do |k,v|
-          s << "  => 0x#{ k[ TO_DPID ].to_s(16) }:#{ k[ TO_PORTNO ] }\n"
+        @links_out.each_pair do |key,val|
+          s << "  => 0x#{ key[ TO_DPID ].to_s(16) }:#{ key[ TO_PORTNO ] }\n"
         end
         return s
       end
