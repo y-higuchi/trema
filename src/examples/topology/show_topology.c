@@ -18,111 +18,140 @@
  */
 
 
-#include <assert.h>
-#include <getopt.h>
 #include <stdio.h>
 #include <unistd.h>
 #include "trema.h"
 #include "libtopology.h"
-#include "show_topology.h"
 #include "topology_service_interface_option_parser.h"
 
 
-typedef struct show_topology_options {
-  enum output_format_type {
-    dsl = 0,
-    graph_easy,
-    csv,
-  } output_format;
-} show_topology_options;
-
-
-static char option_description[] =
-  "  -D, --dsl                       print dsl format\n"
-  "  -G, --graph-easy                print graph-easy format\n"
-  "  -C, --csv                       print csv format\n";
-static char short_options[] = "DGC";
-static struct option long_options[] = {
-  { "dsl", 0, NULL, 'D' },
-  { "graph-easy", 0, NULL, 'G' },
-  { "csv", 0, NULL, 'C' },
-  { NULL, 0, NULL, 0  },
+struct dpid_entry {
+  uint64_t dpid;
 };
 
 
+struct link_entry {
+  uint64_t dpid0;
+  uint64_t dpid1;
+};
+
+
+static bool
+compare_link( const void *x, const void *y ) {
+  const struct link_entry *lx = x;
+  const struct link_entry *ly = y;
+
+  return ( lx->dpid0 == ly->dpid0 && lx->dpid1 == ly->dpid1 );
+}
+
+
+static unsigned int
+hash_link( const void *key ) {
+  const struct link_entry *lkey = key;
+  unsigned int hash = 0;
+
+  hash ^= ( uint ) ( lkey->dpid0 >> 32 ^ lkey->dpid0 );
+  hash ^= ( uint ) ( lkey->dpid1 >> 32 ^ lkey->dpid1 );
+
+  return hash;
+}
+
+
+static uint64_t
+max_dpid( const uint64_t a, const uint64_t b ) {
+  return ( a > b ) ? a : b;
+}
+
+
+static uint64_t
+min_dpid( const uint64_t a, const uint64_t b ) {
+  return ( a > b ) ? b : a;
+}
+
+
 static void
-reset_getopt() {
-  optind = 0;
-  opterr = 1;
+print_with_dsl_format( void *param, size_t entries, const topology_link_status *s ) {
+  size_t i;
+
+  UNUSED( param );
+
+  debug( "topology: entries %zd", entries );
+
+  hash_table *dpid_hash = create_hash( compare_datapath_id, hash_datapath_id );
+  hash_table *link_hash = create_hash( compare_link, hash_link );
+
+  for ( i = 0; i < entries; i++ ) {
+    if ( s[ i ].status != TD_LINK_UP ) {
+      debug( "link down" );
+      continue;
+    }
+
+    // add dpid
+    struct dpid_entry *src = xmalloc( sizeof( struct dpid_entry ) );
+    src->dpid = s[ i ].from_dpid;
+    struct dpid_entry *dentry = lookup_hash_entry( dpid_hash, src );
+    if ( dentry == NULL ) {
+      insert_hash_entry( dpid_hash, src, src );
+    } else {
+      // skip this entry
+      xfree( src );
+    }
+
+    struct dpid_entry *dst = xmalloc( sizeof( struct dpid_entry ) );
+    dst->dpid = s[ i ].to_dpid;
+    dentry = lookup_hash_entry( dpid_hash, dst );
+    if ( dentry == NULL ) {
+      insert_hash_entry( dpid_hash, dst, dst );
+    } else {
+      // skip this entry
+      xfree( dst );
+    }
+
+    // add link
+    struct link_entry *le = xmalloc( sizeof( struct link_entry ) );
+    le->dpid0 = max_dpid( s[ i ].from_dpid, s[ i ].to_dpid );
+    le->dpid1 = min_dpid( s[ i ].from_dpid, s[ i ].to_dpid );
+
+    struct link_entry *lentry = lookup_hash_entry( link_hash, le );
+    if ( lentry == NULL ) {
+      insert_hash_entry( link_hash, le, le );
+    } else {
+      // skip this entry
+      xfree( le );
+    }
+  } // for()
+
+  // dump switches
+  hash_iterator iter;
+  init_hash_iterator( dpid_hash, &iter );
+  hash_entry *e;
+  while ( ( e = iterate_hash_next( &iter ) ) != NULL ) {
+    struct dpid_entry *de = e->value;
+
+    printf( "vswitch {\n" );
+    printf( "  datapath_id \"%#" PRIx64 "\"\n", de->dpid );
+    printf( "}\n\n" );
+    xfree( de );
+  }
+  delete_hash( dpid_hash );
+
+  // dump links
+  init_hash_iterator( link_hash, &iter );
+  while ( ( e = iterate_hash_next( &iter ) ) != NULL ) {
+    struct link_entry *le = e->value;
+    printf( "link \"%#" PRIx64 "\", \"%#" PRIx64 "\"\n", le->dpid0, le->dpid1 );
+    xfree( le );
+  }
+
+  delete_hash( link_hash );
+
+  stop_trema();
 }
 
 
 void
 usage() {
-  topology_service_interface_usage( get_executable_name(), "show topology", option_description );
-}
-
-
-static void
-init_show_topology_options( show_topology_options *options, int *argc, char **argv[] ) {
-  assert( options != NULL );
-  assert( argc != NULL );
-  assert( *argc >= 0 );
-  assert( argv != NULL );
-
-  // set default values
-  options->output_format = dsl;
-
-  int argc_tmp = *argc;
-  char *new_argv[ *argc ];
-
-  int i;
-  for ( i = 0; i <= *argc; ++i ) {
-    new_argv[ i ] = ( *argv )[ i ];
-  }
-
-  int c;
-  while ( ( c = getopt_long( *argc, *argv, short_options, long_options, NULL ) ) != -1 ) {
-    switch ( c ) {
-    case 'D':
-      options->output_format = dsl;
-      break;
-
-    case 'G':
-      options->output_format = graph_easy;
-      break;
-
-    case 'C':
-      options->output_format = csv;
-      break;
-
-    default:
-      continue;
-    }
-
-    if ( optarg == 0 || strchr( new_argv[ optind - 1 ], '=' ) != NULL ) {
-      argc_tmp -= 1;
-      new_argv[ optind - 1 ] = NULL;
-    }
-    else {
-      argc_tmp -= 2;
-      new_argv[ optind - 1 ] = NULL;
-      new_argv[ optind - 2 ] = NULL;
-    }
-  }
-
-  int j;
-  for ( i = 0, j = 0; i < *argc; ++i ) {
-    if ( new_argv[ i ] != NULL ) {
-      ( *argv )[ j ] = new_argv[ i ];
-      j++;
-    }
-  }
-
-  ( *argv )[ *argc ] = NULL;
-  *argc = argc_tmp;
-
-  reset_getopt();
+  topology_service_interface_usage( get_executable_name(), "show topology", NULL );
 }
 
 
@@ -139,28 +168,12 @@ timed_out( void *user_data ) {
 int
 main( int argc, char *argv[] ) {
   init_trema( &argc, &argv );
-  show_topology_options options;
-  init_show_topology_options( &options, &argc, &argv );
   init_topology_service_interface_options( &argc, &argv );
   init_libtopology( get_topology_service_interface_name() );
 
-  switch ( options.output_format ) {
-  case dsl:
-    get_all_link_status( print_with_dsl_format, NULL );
-    break;
 
-  case graph_easy:
-    get_all_link_status( print_with_graph_easy_format, NULL );
-    break;
+  get_all_link_status( print_with_dsl_format, NULL );
 
-  case csv:
-    get_all_link_status( print_with_csv_format, NULL );
-    break;
-
-  default:
-    printf( "not supported\n" );
-    break;
-  }
   add_periodic_event_callback( 10, timed_out, NULL );
 
   start_trema();
