@@ -41,8 +41,6 @@ task :default => [
   :switch_manager,
   :switch,
   :topology,
-  :show_topology,
-  :show_switch_status,
   :packetin_filter,
   :tremashark,
   :packet_capture,
@@ -67,6 +65,7 @@ task :examples => [
   "examples:packetin_filter_config",
   "examples:switch_info",
   "examples:switch_monitor",
+  "examples:topology",
   "examples:traffic_monitor",
 ]
 
@@ -501,32 +500,56 @@ file Trema::Executables.topology => topology_objects + [ libtrema ] do | t |
   sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
 end
 
-show_topology_objects = [
-  "show_topology.o",
-  "show_topology_csv.o",
-  "show_topology_dsl.o",
-  "show_topology_graph_easy.o",
-].collect do | each |
-  File.join topology_objects_dir, each
+################################################################################
+# Build topology examples
+################################################################################
+
+topology_examples_source_dir = "src/examples/topology"
+topology_examples_objects_dir = objects( "examples/topology" )
+
+gen C::Dependencies, dependency( "examples:topology" ),
+  :search => [ Trema.include ], :sources => sys[ "#{ topology_examples_source_dir }/*.c" ]
+
+gen Action do
+  source dependency( "examples:topology" )
 end
 
-desc "Build show_topology."
-task :show_topology => Trema::Executables.show_topology
-file Trema::Executables.show_topology => show_topology_objects + [ libtrema ] do | t |
-  sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
+gen Directory, topology_examples_objects_dir
+
+
+gen DirectedRule, topology_examples_objects_dir => [ topology_examples_source_dir ], :o => :c do | t |
+  sys "gcc -I#{ Trema.include } -I#{ Trema.openflow } #{ var :CFLAGS } -c -o #{ t.name } #{ t.source }"
+end
+
+show_topology_objects = [
+  "show_topology.o",
+].collect do | each |
+  File.join topology_examples_objects_dir, each
 end
 
 show_switch_status_objects = [
   "show_switch_status.o"
 ].collect do | each |
-  File.join topology_objects_dir, each
+  File.join topology_examples_objects_dir, each
 end
 
-desc "Build show_switch_status."
-task :show_switch_status => Trema::Executables.show_switch_status
-file Trema::Executables.show_switch_status => show_switch_status_objects + [ libtrema ] do | t |
-  sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
+topology_examples_binaries = {
+  "show_topology" => show_topology_objects,
+  "show_switch_status" => show_switch_status_objects,
+}
+
+desc "Build topology examples."
+topology_examples_binaries.each_pair do | bin, objs |
+  target = File.join( topology_examples_objects_dir, bin )
+  task "examples:topology:#{bin}" => target
+  file target => objs + [ libtrema ] do | t |
+    sys "gcc -L#{ Trema.lib } -o #{ t.name } #{ sys.sp t.prerequisites } -ltrema -lsqlite3 -ldl -lrt -lpthread"
+  end
 end
+
+
+task "examples:topology" => topology_examples_binaries.keys.map {|e| "examples:topology:#{e}" }
+
 
 ################################################################################
 # Build switch manager

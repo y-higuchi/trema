@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include "trema.h"
 #include "libtopology.h"
-#include "show_topology.h"
 #include "topology_service_interface_option_parser.h"
 
 
@@ -58,8 +57,12 @@ print_port_status( void *user_data, size_t number, const topology_port_status *p
         status = "up";
         break;
     }
-    printf( "  dpid : 0x%" PRIx64 ", port : 0x%d(%s), status : %s\n", 
-            port->dpid, port->port_no, port->name, status );
+    const char *external = "false";
+    if ( port->external == TD_PORT_EXTERNAL) {
+      external = "true";
+    }
+    printf( "  dpid : 0x%" PRIx64 ", port : %d(%s), status : %s, external : %s\n",
+            port->dpid, port->port_no, port->name, status, external );
   }
   
   stop_trema();
