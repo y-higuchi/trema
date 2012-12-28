@@ -45,6 +45,7 @@
 #include "stats-reply.h"
 #include "stats-request.h"
 #include "switch.h"
+#include "topology.h"
 #include "vendor.h"
 
 
@@ -108,6 +109,7 @@ Init_trema() {
   Init_stats_reply();
   Init_stats_request();
   Init_switch();
+  Init_topology();
   Init_vendor();
 
   rb_require( "trema/exact-match" );
