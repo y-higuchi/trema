@@ -1,7 +1,5 @@
 /*
- * Author: Shuji Ishii, Kazushi SUGYO
- *
- * Copyright (C) 2008-2011 NEC Corporation
+ * Copyright (C) 2008-2012 NEC Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2, as
@@ -18,24 +16,18 @@
  */
 
 
-#ifndef TOPOLOGY_MANAGEMENT_H
-#define TOPOLOGY_MANAGEMENT_H
+#ifndef TOPOLOGY_OPTION_PARSER_H_
+#define TOPOLOGY_OPTION_PARSER_H_
 
+#include "service_management.h"
+#include "discovery_management.h"
 
-#include "trema.h"
+typedef struct {
+  service_management_options service;
+  discovery_management_options discovery;
+} topology_options;
 
-bool init_topology_management( void );
-void finalize_topology_management( void );
+void
+parse_options( topology_options *options, int *argc, char **argv[] );
 
-bool start_topology_management( void );
-void stop_topology_management( void );
-
-#endif // TOPOLOGY_MANAGEMENT_H
-
-
-/*
- * Local variables:
- * c-basic-offset: 2
- * indent-tabs-mode: nil
- * End:
- */
+#endif /* TOPOLOGY_OPTION_PARSER_H_ */
