@@ -21,8 +21,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "trema.h"
-#include "libtopology.h"
-#include "topology_service_interface_option_parser.h"
 
 
 void

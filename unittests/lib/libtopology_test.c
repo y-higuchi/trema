@@ -14,7 +14,7 @@
 #include "checks.h"
 #include "cmockery_trema.h"
 
-#include "libtopology.h"
+#include "topology.h"
 
 #include "event_handler.h"
 #include "messenger.h"

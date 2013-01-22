@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include "trema.h"
-#include "libtopology.h"
+#include "topology.h"
 
 static char *libtopology_queue_name = NULL;
 static char *topology_name = NULL;
