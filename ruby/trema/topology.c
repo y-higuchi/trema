@@ -19,7 +19,7 @@
 #include "ruby.h"
 #include "topology.h"
 
-#include "libtopology.h"
+#include "trema.h"
 
 #include <stdio.h>
 #include <stdlib.h>
