@@ -1,20 +1,36 @@
-require "trema/topology"
-require "trema/topology/topology_cache"
+#
+# Copyright (C) 2008-2013 NEC Corporation
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2, as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+
+require "trema/topology/map_api"
 
 
 # Controller which keeps printing Switch and Link change event as graphviz dot file.
 # It will shutdown itself if there was no Switch or Link event for 60 seconds.
 #
 class ChangeHistory < Controller
-  include Topology
+  include TopologyMap
 
   # TODO Add option to specify idle check interval.
   periodic_timer_event :shutdown_on_idle, 60
 
   oneshot_timer_event :on_start, 0
   def on_start
-    enable_topology_discovery
-    send_rebuild_cache_request
+    send_enable_topology_discovery
+    send_rebuild_map_request
 
     # TODO Add option to specify file from command line.
     @dotfile = File.open( "change-history.dot", "w" )
@@ -28,7 +44,7 @@ class ChangeHistory < Controller
   end
 
 
-  def cache_ready g
+  def map_ready g
     @generation = 0
 
     # Initially color everything as updated (green)
@@ -43,30 +59,41 @@ class ChangeHistory < Controller
   end
 
 
-  def switch_status_updated sw_attr
+  def switch_status_up dpid
     if not instance_variable_defined?(:@generation) then
       return nil
     end
 
     @generation += 1
-    sw_attr[:generation] = @generation
-
-    g = get_cache
+    g = get_last_map
     remove_old_colors( g, @generation )
 
-    if sw_attr[:up] then
-      sw_attr[:color] = "green"
-      update_cache_by_switch_hash sw_attr
-      sublabel = "0x#{sw_attr[:dpid].to_s(16)} up"
-      puts_dotfile to_dot_subgraph( g, @generation, sublabel )
-    else
-      g.switches[ sw_attr[:dpid] ][:color] = "red" if g.switches[ sw_attr[:dpid] ]
-      sublabel = "0x#{sw_attr[:dpid].to_s(16)} down"
-      puts_dotfile to_dot_subgraph( g, @generation, sublabel )
-      # update to new state. (switch instance will be removed)
-      update_cache_by_switch_hash sw_attr
+    sw = Switch.new( dpid )
+    sw[:generation] = @generation
+    sw[:color] = "green"
+    update_map_by_switch_hash sw
+    sublabel = "0x#{dpid.to_s(16)} up"
+    puts_dotfile to_dot_subgraph( g, @generation, sublabel )
+  end
+
+  
+  def switch_status_down dpid
+    if not instance_variable_defined?(:@generation) then
+      return nil
     end
 
+    @generation += 1
+    g = get_last_map
+    remove_old_colors( g, @generation )
+
+    sw = Switch.new( dpid )
+    sw.up = false
+    sw[:generation] = @generation
+    g.switches[ dpid ][:color] = "red" if g.switches[ dpid ]
+    sublabel = "0x#{dpid.to_s(16)} down"
+    puts_dotfile to_dot_subgraph( g, @generation, sublabel )
+    # update to new state. (switch instance will be removed)
+    update_map_by_switch_hash sw
   end
 
 
@@ -74,17 +101,17 @@ class ChangeHistory < Controller
     if not instance_variable_defined?(:@generation) then
       return nil
     end
-    link = Link[link_attr]
+    link = Link.new( link_attr )
 
     @generation += 1
     link[:generation] = @generation
 
-    g = get_cache
+    g = get_last_map
     remove_old_colors( g, @generation )
 
     if link.up? then
       link[:color] = "green"
-      update_cache_by_link_hash link
+      update_map_by_link_hash link
       sublabel = "(0x#{link.from_dpid.to_s(16)} -> 0x#{link.to_dpid.to_s(16)}) up"
       puts_dotfile to_dot_subgraph( g, @generation, sublabel )
     else
@@ -92,7 +119,7 @@ class ChangeHistory < Controller
       sublabel = "(0x#{link.from_dpid.to_s(16)} -> 0x#{link.to_dpid.to_s(16)}) down"
       puts_dotfile to_dot_subgraph( g, @generation, sublabel )
       # update to new state. (link instance will be removed)
-      update_cache_by_link_hash link
+      update_map_by_link_hash link
     end
   end
 
@@ -125,7 +152,7 @@ class ChangeHistory < Controller
     # // switches
     g.switches.each do | _, sw |
       dot_attrs = %Q(label="0x#{sw.dpid.to_s(16)}")
-      if sw.member?(:color) then
+      if sw.property.has_key?(:color) then
         dot_attrs << ", " unless dot_attrs.empty?
         dot_attrs << %Q(color="#{sw[:color]}")
       end
@@ -134,7 +161,7 @@ class ChangeHistory < Controller
     # // links
     g.links.each do | _, lnk |
       dot_attrs = ""
-      if lnk.member?(:color) then
+      if lnk.property.has_key?(:color) then
         dot_attrs << ", " unless dot_attrs.empty?
         dot_attrs << %Q(color="#{lnk[:color]}")
       end
@@ -157,5 +184,4 @@ class ChangeHistory < Controller
     end
   end
 end
-
 

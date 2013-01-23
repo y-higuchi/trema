@@ -19,40 +19,46 @@
 module Trema
   module Topology
     # A class to represent a port in a Topology
-    class Port < Hash
+    class Port
+
+      # @!attribute [r] dpid
       # @return [Integer] datapath ID of the switch which this port belong to.
       def dpid
-        return self[:dpid]
+        return @property[:dpid]
       end
 
 
+      # @!attribute [r] portno
       # @return [Integer] port number
       def portno
-        return self[:portno]
+        return @property[:portno]
       end
 
 
+      # @!attribute [r] up
       # @return [Boolean] returns true if port is up
       def up?
-        return self[:up]
+        return @property[:up]
       end
 
 
       # @return [Boolean] returns true if port is external
       def external?
-        return self[:external] == Topology::TD_PORT_EXTERNAL
+        return @property[:external]
       end
 
 
+      # @!attribute [r] name
       # @return [String] returns port's name
       def name
-        return self[:name]
+        return @property[:name]
       end
 
 
+      # @!attribute [r] mac
       # @return [String] returns port's mac address
       def mac
-        return self[:mac]
+        return @property[:mac]
       end
 
 
@@ -62,31 +68,24 @@ module Trema
       end
 
 
-      # @return [String] Port key as a String
-      def key_str
-        return "P#{ dpid.to_s(16) }-#{ portno.to_s }"
-      end
-
-
       # Port constructor
       # @param [Hash] port Hash containing Port properties. Must at least contain keys listed in Options.
       # @option port [Integer] :dpid Switch dpid which this port belongs
       # @option port [Integer] :portno port number
       # @return [Port]
       # @example
-      #   port = Port[ {:dpid => 1234, :portno => 42} ]
-      def Port.[]( port )
-        raise ArgumentError, "Key element for Port missing in Hash" if not Port.has_keys?( port )
-
-        port[ :dpid ].freeze
-        port[ :portno ].freeze
-        super( port )
+      #   port = Port.new( {:dpid => 1234, :portno => 42} )
+      def initialize( port )
+        raise ArgumentError, "Mandatory key element for Port missing in Hash" if not Port.has_mandatory_keys?( port )
+        # TODO type check mandatory key?
+        # TODO copy Hash?
+        @property = port
       end
 
 
-      # @param key Hash key element
+      # @param [Symbol] key Hash key element
       # @return [Boolean] true if key is key element for Port
-      def Port.is_key?( key )
+      def Port.is_mandatory_key?( key )
         case key
         when :dpid, :portno
           return true
@@ -99,29 +98,24 @@ module Trema
       # Test if Hash has required key as a Port instance
       # @param hash Hash to test
       # @return [Boolean] true if hash has all required keys.
-      def Port.has_keys?( hash )
+      def Port.has_mandatory_keys?( hash )
         return !(hash.values_at(:dpid, :portno).include? nil)
       end
 
 
-      # @private
-      def initialize( *arg )
-        raise ArgumentError, "Empty Port cannot be created. Use Port[ {...} ] form."
-      end
-
-
+      # @return [String] human readable string representation.
       def to_s
         "Port: 0x#{ dpid.to_s(16) }:#{ portno.to_s } - {#{property_to_s}}"
       end
 
 
       ############################################################################
-      private
+      protected
       ############################################################################
 
 
       def property_to_s
-        kvp_ary = self.select { |key,_| not Port.is_key?(key) }
+        kvp_ary = @property.select { |key,_| not Port.is_mandatory_key?( key ) }
         kvp_ary = kvp_ary.sort_by { |key,_| key.to_s }
         s = kvp_ary.map { |key, val| "#{key.to_s}:#{val.inspect}" }.join(", ")
         return s

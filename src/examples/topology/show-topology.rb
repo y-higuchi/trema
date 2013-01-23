@@ -1,32 +1,48 @@
-require "trema/topology"
+#
+# Copyright (C) 2008-2013 NEC Corporation
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2, as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
 
 
 class ShowTopology < Controller
   include Topology
 
+  EXISTS = nil
 
   oneshot_timer_event :timed_out, 10
   oneshot_timer_event :on_start, 0
   def on_start
-    send_all_link_status_request
+    get_all_link_status
   end
 
 
-  def all_link_status_reply link_status
+  def all_link_status link_status
     dpids = Hash.new
     links = Hash.new
 
     debug "topology: entries #{link_status.size}"
 
     link_status.each do | link_hash |
-      link = Link[link_hash]
+      link = Link.new( link_hash )
       if link.up? then
-        dpids[link.from_dpid] = nil
-        dpids[link.to_dpid] = nil
+        dpids[link.from_dpid] = EXISTS
+        dpids[link.to_dpid] = EXISTS
 
         dpid_pair = [link.from_dpid, link.to_dpid]
 
-        links[ [dpid_pair.max, dpid_pair.min] ] = nil
+        links[ [dpid_pair.max, dpid_pair.min] ] = EXISTS
       else
         debug "link down"
       end

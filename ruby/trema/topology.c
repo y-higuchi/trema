@@ -28,6 +28,14 @@ extern VALUE mTrema;
 VALUE mTopology;
 
 
+typedef struct topology_callback {
+  VALUE self;
+  VALUE block;
+} topology_callback;
+
+
+static VALUE topology_subscribe_topology( VALUE self );
+static VALUE topology_enable_topology_discovery( VALUE self );
 /*
  * init_libtopology(service_name)
  *   Initialize topology client.
@@ -40,7 +48,28 @@ VALUE mTopology;
 static VALUE
 topology_init_libtopology( VALUE self, VALUE service_name ) {
   init_libtopology( StringValuePtr( service_name ) );
+  rb_iv_set( self, "@is_libtopology_initialized", Qtrue );
   return self;
+}
+
+
+static void
+maybe_init_libtopology( VALUE self ) {
+  ID is_init = rb_intern( "@is_libtopology_initialized" );
+  if ( rb_ivar_defined( self, is_init ) == Qfalse ||
+       rb_ivar_get( self, is_init ) == Qfalse ) {
+    info( "libtopology was not initialized. Default initializing." );
+    init_libtopology( "topology" );
+    rb_iv_set( self, "@is_libtopology_initialized", Qtrue );
+
+    if ( rb_funcall( self, rb_intern( "topology_handler_implemented?" ), 0 ) == Qtrue ) {
+      topology_subscribe_topology( self );
+    }
+
+    if ( rb_respond_to( ( VALUE ) self, rb_intern( "link_status_updated" ) ) == Qtrue ) {
+      topology_enable_topology_discovery( self );
+    }
+  }
 }
 
 
@@ -53,16 +82,18 @@ topology_init_libtopology( VALUE self, VALUE service_name ) {
 static VALUE
 topology_finalize_libtopology( VALUE self ) {
   finalize_libtopology();
+  rb_iv_set( self, "@is_libtopology_initialized", Qfalse );
   return self;
 }
+
 
 static VALUE
 switch_status_to_hash( const topology_switch_status* sw_status ) {
   VALUE sw = rb_hash_new();
   rb_hash_aset( sw, ID2SYM( rb_intern( "dpid" ) ), ULL2NUM( sw_status->dpid ) );
-  rb_hash_aset( sw, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)sw_status->status ) );
+//  rb_hash_aset( sw, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)sw_status->status ) );
 
-  if( sw_status->status == TD_SWITCH_UP ) {
+  if ( sw_status->status == TD_SWITCH_UP ) {
     rb_hash_aset( sw, ID2SYM( rb_intern( "up" ) ), Qtrue );
   } else {
     rb_hash_aset( sw, ID2SYM( rb_intern( "up" ) ), Qfalse );
@@ -70,19 +101,17 @@ switch_status_to_hash( const topology_switch_status* sw_status ) {
   return sw;
 }
 
+
 static void
 handle_switch_status_updated( void* self, const topology_switch_status* sw_status ) {
-  rb_iv_set( ( VALUE ) self, "@cache_up_to_date",  Qfalse);
+  rb_iv_set( ( VALUE ) self, "@map_up_to_date",  Qfalse);
 
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "switch_status_updated" ) ) == Qtrue ) {
-    VALUE sw = switch_status_to_hash( sw_status );
-    rb_funcall( ( VALUE ) self, rb_intern( "switch_status_updated" ), 1, sw );
-  }
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "_switch_status_updated" ) ) == Qtrue ) {
     VALUE sw = switch_status_to_hash( sw_status );
     rb_funcall( ( VALUE ) self, rb_intern( "_switch_status_updated" ), 1, sw );
   }
 }
+
 
 static VALUE
 port_status_to_hash( const topology_port_status* port_status ) {
@@ -93,10 +122,16 @@ port_status_to_hash( const topology_port_status* port_status ) {
   rb_hash_aset( port, ID2SYM( rb_intern( "name" ) ), rb_str_new2( port_status->name ) );
   char macaddr[] = "FF:FF:FF:FF:FF:FF";
   const uint8_t* mac = port_status->mac;
-  snprintf ( macaddr, sizeof(macaddr), "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+  snprintf( macaddr, sizeof(macaddr), "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
   rb_hash_aset( port, ID2SYM( rb_intern( "mac" ) ), rb_str_new2( macaddr ) );
-  rb_hash_aset( port, ID2SYM( rb_intern( "external" ) ), INT2FIX( (int)port_status->external ) );
-  rb_hash_aset( port, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)port_status->status ) );
+//  rb_hash_aset( port, ID2SYM( rb_intern( "external" ) ), INT2FIX( (int)port_status->external ) );
+//  rb_hash_aset( port, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)port_status->status ) );
+
+  if ( port_status->external == TD_PORT_EXTERNAL ) {
+    rb_hash_aset( port, ID2SYM( rb_intern( "external" ) ), Qtrue );
+  } else {
+    rb_hash_aset( port, ID2SYM( rb_intern( "external" ) ), Qfalse );
+  }
 
   if ( port_status->status == TD_PORT_UP ) {
     rb_hash_aset( port, ID2SYM( rb_intern( "up" ) ), Qtrue );
@@ -106,19 +141,17 @@ port_status_to_hash( const topology_port_status* port_status ) {
   return port;
 }
 
+
 static void
 handle_port_status_updated( void* self, const topology_port_status* port_status ) {
-  rb_iv_set( ( VALUE ) self, "@cache_up_to_date",  Qfalse);
+  rb_iv_set( ( VALUE ) self, "@map_up_to_date",  Qfalse);
 
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "port_status_updated" ) ) == Qtrue ) {
-    VALUE port = port_status_to_hash( port_status );
-    rb_funcall( ( VALUE ) self, rb_intern( "port_status_updated" ), 1, port );
-  }
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "_port_status_updated" ) ) == Qtrue ) {
     VALUE port = port_status_to_hash( port_status );
     rb_funcall( ( VALUE ) self, rb_intern( "_port_status_updated" ), 1, port );
   }
 }
+
 
 static VALUE
 link_status_to_hash( const topology_link_status* link_status ) {
@@ -127,14 +160,14 @@ link_status_to_hash( const topology_link_status* link_status ) {
   rb_hash_aset( link, ID2SYM( rb_intern( "from_portno" ) ), INT2FIX( (int)link_status->from_portno ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "to_dpid" ) ), ULL2NUM( link_status->to_dpid ) );
   rb_hash_aset( link, ID2SYM( rb_intern( "to_portno" ) ), INT2FIX( (int)link_status->to_portno ) );
-  rb_hash_aset( link, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)link_status->status ) );
+//  rb_hash_aset( link, ID2SYM( rb_intern( "status" ) ), INT2FIX( (int)link_status->status ) );
 
-  if( link_status->status != TD_LINK_DOWN ) {
+  if ( link_status->status != TD_LINK_DOWN ) {
     rb_hash_aset( link, ID2SYM( rb_intern( "up" ) ), Qtrue );
   } else {
     rb_hash_aset( link, ID2SYM( rb_intern( "up" ) ), Qfalse );
   }
-  if( link_status->status == TD_LINK_UNSTABLE ) {
+  if ( link_status->status == TD_LINK_UNSTABLE ) {
     rb_hash_aset( link, ID2SYM( rb_intern( "unstable" ) ), Qtrue );
   } else {
     rb_hash_aset( link, ID2SYM( rb_intern( "unstable" ) ), Qfalse );
@@ -142,14 +175,11 @@ link_status_to_hash( const topology_link_status* link_status ) {
   return link;
 }
 
+
 static void
 handle_link_status_updated( void* self, const topology_link_status* link_status ) {
-  rb_iv_set( ( VALUE ) self, "@cache_up_to_date",  Qfalse);
+  rb_iv_set( ( VALUE ) self, "@map_up_to_date",  Qfalse);
 
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "link_status_updated" ) ) == Qtrue ) {
-    VALUE link = link_status_to_hash( link_status );
-    rb_funcall( ( VALUE ) self, rb_intern( "link_status_updated" ), 1, link );
-  }
   if ( rb_respond_to( ( VALUE ) self, rb_intern( "_link_status_updated" ) ) == Qtrue ) {
     VALUE link = link_status_to_hash( link_status );
     rb_funcall( ( VALUE ) self, rb_intern( "_link_status_updated" ), 1, link );
@@ -162,117 +192,148 @@ handle_subscribed_reply( void* self, topology_response *res ) {
   switch ( res->status ) {
   case TD_RESPONSE_OK:
   case TD_RESPONSE_ALREADY_SUBSCRIBED:
-    if( res->status == TD_RESPONSE_ALREADY_SUBSCRIBED ){
+    if ( res->status == TD_RESPONSE_ALREADY_SUBSCRIBED ) {
       warn( "Already subscribed to topology service." );
     }
 
-    rb_iv_set( (VALUE)self, "@is_topology_ready", Qtrue );
+    rb_iv_set( (VALUE)self, "@is_subscribed", Qtrue );
 
-    if ( rb_respond_to( ( VALUE ) self, rb_intern( "topology_ready" ) ) == Qtrue ) {
-      rb_funcall( ( VALUE ) self, rb_intern( "topology_ready" ), 0 );
+    if ( rb_respond_to( ( VALUE ) self, rb_intern( "subscribe_topology_reply" ) ) == Qtrue ) {
+      rb_funcall( ( VALUE ) self, rb_intern( "subscribe_topology_reply" ), 0 );
     }
     break;
 
   default:
-    warn( "%s: Abnormal subscription reply: %#x", __func__, (unsigned int)res->status );
+    warn( "%s: Abnormal subscribed reply: %#x", __func__, (unsigned int)res->status );
   }
 }
 
 
 static void
-handle_unsubscribed_reply( void* self, topology_response *res ) {
-  if( res->status == TD_RESPONSE_NO_SUCH_SUBSCRIBER ) {
+handle_unsubscribed_reply( void* tcb, topology_response *res ) {
+  topology_callback* cb = tcb;
+  VALUE self = cb->self;
+  VALUE block = cb->block;
+
+  if ( res->status == TD_RESPONSE_NO_SUCH_SUBSCRIBER ) {
     warn( "Already unsubscribed from topology Service." );
-  }else{
-    warn( "%s: Abnormal unsubscription reply: %#x", __func__, (unsigned int)res->status );
+  } else if ( res->status != TD_RESPONSE_OK ) {
+    warn( "%s: Abnormal unsubscribed reply: %#x", __func__, (unsigned int)res->status );
   }
-  rb_iv_set( (VALUE)self, "@is_topology_ready", Qfalse );
+  rb_iv_set( self, "@is_subscribed", Qfalse );
+
+  if ( block != Qnil ){
+    rb_funcall( block, rb_intern( "call" ), 0 );
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "unsubscribe_topology_reply" ) ) == Qtrue ) {
+    rb_funcall( ( VALUE ) self, rb_intern( "unsubscribe_topology_reply" ), 0 );
+  }
+  xfree( cb );
 }
 
 
 /**
- * subscribe_topology()
- *   Subscribe to topology.
- *
- *   This method is intended to be called inside Controller#start.
- *
+ * @!group Topology update event subscription control
+ * Manually subscribe to topology to get topology update events.
+ * @note This will be automatically called by #start if a Topology update event handler is defined.
+ * @return [Boolean] true if request sent successfully.
  */
 static VALUE
 topology_subscribe_topology( VALUE self ) {
+  maybe_init_libtopology( self );
   add_callback_switch_status_updated( handle_switch_status_updated, ( void * ) self );
   add_callback_port_status_updated( handle_port_status_updated, ( void * ) self );
   add_callback_link_status_updated( handle_link_status_updated, ( void * ) self );
 
-  subscribe_topology( handle_subscribed_reply, ( void * ) self );
-  return self;
+  bool succ = subscribe_topology( handle_subscribed_reply, ( void * ) self );
+  return ( succ )? Qtrue : Qfalse;
 }
 
+
 /**
- * unsubscribe_topology()
- *   Unsubscribe from topology.
+ * @!group Topology update event subscription control
+ * Unsubscribe from topology.
  *
- *   This method is intended to be called inside Controller#shutdown!.
+ * @return [Boolean] true if request sent successfully.
  *
  */
 static VALUE
 topology_unsubscribe_topology( VALUE self ) {
-  unsubscribe_topology( handle_unsubscribed_reply, ( void * ) self );
+  maybe_init_libtopology( self );
+
+  topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
+  cb->self = self;
+  if ( rb_block_given_p() == Qtrue ) {
+    cb->block = rb_block_proc();
+  } else {
+    cb->block = Qnil;
+  }
+  bool succ = unsubscribe_topology( handle_unsubscribed_reply, ( void * ) cb );
 
   add_callback_switch_status_updated( NULL, NULL );
   add_callback_port_status_updated( NULL, NULL );
   add_callback_link_status_updated( NULL, NULL );
-  return self;
+  return ( succ )? Qtrue : Qfalse;
 }
+
 
 static void
 handle_enable_topology_discovery_reply( void* self, const topology_response *res ) {
-  if( res->status != TD_RESPONSE_OK ){
+  if ( res->status != TD_RESPONSE_OK ) {
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
     return;
   }
-  if ( rb_respond_to( ( VALUE ) self, rb_intern( "topology_discovery_ready" ) ) == Qtrue ) {
-    rb_funcall( ( VALUE ) self, rb_intern( "topology_discovery_ready" ), 0 );
+  if ( rb_respond_to( ( VALUE ) self, rb_intern( "enable_topology_discovery_reply" ) ) == Qtrue ) {
+    rb_funcall( ( VALUE ) self, rb_intern( "enable_topology_discovery_reply" ), 0 );
   }
 }
 
+
 /**
- *  @group Discovery control
+ *  @!group Discovery control
  *
  * Enable topology discovery.
+ *
+ * @return [Boolean] true if request sent successfully.
  *
  */
 static VALUE
 topology_enable_topology_discovery( VALUE self ) {
-  enable_topology_discovery( handle_enable_topology_discovery_reply, (void*) self );
-  return self;
+  maybe_init_libtopology( self );
+
+  bool succ = enable_topology_discovery( handle_enable_topology_discovery_reply, (void*) self );
+  return ( succ )? Qtrue : Qfalse;
 }
+
 
 static void
 handle_disable_topology_discovery_reply( void* self, const topology_response *res ) {
   UNUSED( self );
-  if( res->status != TD_RESPONSE_OK ){
+  if ( res->status != TD_RESPONSE_OK ) {
     warn( "%s: Abnormal reply: %#x", __func__, (unsigned int)res->status );
     return;
   }
+  if ( rb_respond_to( ( VALUE ) self, rb_intern( "disable_topology_discovery_reply" ) ) == Qtrue ) {
+    rb_funcall( ( VALUE ) self, rb_intern( "disable_topology_discovery_reply" ), 0 );
+  }
 }
 
+
 /**
- *  @group Discovery control
+ *  @!group Discovery control
  *
  * Disable topology discovery.
+ *
+ * @return [Boolean] true if request sent successfully.
  *
  */
 static VALUE
 topology_disable_topology_discovery( VALUE self ) {
-  disable_topology_discovery( handle_disable_topology_discovery_reply, (void*) self );
-  return self;
+  maybe_init_libtopology( self );
+
+  bool succ = disable_topology_discovery( handle_disable_topology_discovery_reply, (void*) self );
+  return ( succ )? Qtrue : Qfalse;
 }
 
-
-typedef struct topology_callback {
-  VALUE self;
-  VALUE block;
-} topology_callback;
 
 static void
 handle_get_all_link_status_callback( void *tcb, size_t number, const topology_link_status *link_status ) {
@@ -280,27 +341,27 @@ handle_get_all_link_status_callback( void *tcb, size_t number, const topology_li
   VALUE self = cb->self;
   VALUE block = cb->block;
 
-  if ( block != Qnil ){
+  if ( block != Qnil ) {
     VALUE links = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE link = link_status_to_hash( &link_status[i] );
       rb_ary_push( links, link );
     }
     rb_funcall( block, rb_intern( "call" ), 1, links );
-  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_link_status_reply" ) ) == Qtrue ) {
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_link_status" ) ) == Qtrue ) {
     VALUE links = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE link = link_status_to_hash( &link_status[i] );
       rb_ary_push( links, link );
     }
-    rb_funcall( ( VALUE ) self, rb_intern( "all_link_status_reply" ), 1, links );
+    rb_funcall( ( VALUE ) self, rb_intern( "all_link_status" ), 1, links );
   }
   xfree( cb );
 }
 
 
 /**
- *  @group Get all status requests
+ *  @!group Get all status request/reply
  *
  * Request Topology service to send all link status it holds.
  * Results will be returned as callback to Block given,
@@ -308,20 +369,24 @@ handle_get_all_link_status_callback( void *tcb, size_t number, const topology_li
  *
  * @yieldparam switches [Array<Hash>]  Array of Hash including current status.
  *
+ * @return [Boolean] true if request sent successfully.
+ *
  * @see #link_status_updated Each Hash instance included in the array is equivalent to link_status_updated argument Hash.
- * @see #all_link_status_reply
+ * @see #all_link_status
  */
 static VALUE
 topology_send_all_link_status( VALUE self ) {
+  maybe_init_libtopology( self );
+
   topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
   cb->self = self;
-  if( rb_block_given_p() == Qtrue ) {
+  if ( rb_block_given_p() == Qtrue ) {
     cb->block = rb_block_proc();
   } else {
     cb->block = Qnil;
   }
-  get_all_link_status( handle_get_all_link_status_callback, (void*) cb );
-  return self;
+  bool succ = get_all_link_status( handle_get_all_link_status_callback, (void*) cb );
+  return ( succ )? Qtrue : Qfalse;
 }
 
 
@@ -331,27 +396,27 @@ handle_get_all_port_status_callback( void *tcb, size_t number, const topology_po
   VALUE self = cb->self;
   VALUE block = cb->block;
 
-  if ( block != Qnil ){
+  if ( block != Qnil ) {
     VALUE ports = rb_ary_new2( (long)number );
-    for( size_t i = 0 ; i < number ; ++i ){
+    for( size_t i = 0 ; i < number ; ++i ) {
       VALUE port = port_status_to_hash( &port_status[i] );
       rb_ary_push( ports, port );
     }
     rb_funcall( block, rb_intern( "call" ), 1, ports );
-  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_port_status_reply" ) ) == Qtrue ) {
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_port_status" ) ) == Qtrue ) {
     VALUE ports = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE port = port_status_to_hash( &port_status[i] );
       rb_ary_push( ports, port );
     }
-    rb_funcall( ( VALUE ) self, rb_intern( "all_port_status_reply" ), 1, ports );
+    rb_funcall( ( VALUE ) self, rb_intern( "all_port_status" ), 1, ports );
   }
   xfree( cb );
 }
 
 
 /**
- *  @group Get all status requests
+ *  @!group Get all status request/reply
  *
  * Request Topology service to send all port status it holds.
  * Results will be returned as callback to Block given,
@@ -359,19 +424,24 @@ handle_get_all_port_status_callback( void *tcb, size_t number, const topology_po
  *
  * @yieldparam ports [Array<Hash>]  Array of Hash including current status.
  *
+ * @return [Boolean] true if request sent successfully.
+ *
  * @see #port_status_updated Each Hash instance included in the array is equivalent to port_status_updated argument Hash.
- * @see #all_port_status_reply */
+ * @see #all_port_status
+ */
 static VALUE
 topology_send_all_port_status( VALUE self ) {
+  maybe_init_libtopology( self );
+
   topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
   cb->self = self;
-  if( rb_block_given_p() == Qtrue ) {
+  if ( rb_block_given_p() == Qtrue ) {
     cb->block = rb_block_proc();
   } else {
     cb->block = Qnil;
   }
-  get_all_port_status( handle_get_all_port_status_callback, (void*) cb );
-  return self;
+  bool succ = get_all_port_status( handle_get_all_port_status_callback, (void*) cb );
+  return ( succ )? Qtrue : Qfalse;
 }
 
 
@@ -381,27 +451,27 @@ handle_get_all_switch_status_callback( void *tcb, size_t number, const topology_
   VALUE self = cb->self;
   VALUE block = cb->block;
 
-  if ( block != Qnil ){
+  if ( block != Qnil ) {
     VALUE switches = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE sw = switch_status_to_hash( &sw_status[i] );
       rb_ary_push( switches, sw );
     }
     rb_funcall( block, rb_intern( "call" ), 1, switches );
-  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_switch_status_reply" ) ) == Qtrue ) {
+  } else if ( rb_respond_to( ( VALUE ) self, rb_intern( "all_switch_status" ) ) == Qtrue ) {
     VALUE switches = rb_ary_new2( (long)number );
     for( size_t i = 0 ; i < number ; ++i ){
       VALUE sw = switch_status_to_hash( &sw_status[i] );
       rb_ary_push( switches, sw );
     }
-    rb_funcall( ( VALUE ) self, rb_intern( "all_switch_status_reply" ), 1, switches );
+    rb_funcall( ( VALUE ) self, rb_intern( "all_switch_status" ), 1, switches );
   }
   xfree( cb );
 }
 
 
 /**
- *  @group Get all status requests
+ *  @!group Get all status request/reply
  *
  * @!method send_all_switch_status_request { |switches| ... } | nil
  * Request Topology service to send all switch status it holds.
@@ -410,56 +480,69 @@ handle_get_all_switch_status_callback( void *tcb, size_t number, const topology_
  *
  * @yieldparam switches [Array<Hash>]  Array of Hash including current status.
  *
+ * @return [Boolean] true if request sent successfully.
+ *
  * @see #switch_status_updated Each Hash instance included in the array is equivalent to switch_status_updated argument Hash.
- * @see #all_switch_status_reply
+ * @see #all_switch_status
  */
 static VALUE
 topology_send_all_switch_status( VALUE self ) {
+  maybe_init_libtopology( self );
+
   topology_callback* cb = xcalloc( 1, sizeof(topology_callback) );
   cb->self = self;
-  if( rb_block_given_p() == Qtrue ) {
+  if ( rb_block_given_p() == Qtrue ) {
     cb->block = rb_block_proc();
   } else {
     cb->block = Qnil;
   }
-  get_all_switch_status( handle_get_all_switch_status_callback, (void*) cb );
-  return self;
+  bool succ = get_all_switch_status( handle_get_all_switch_status_callback, (void*) cb );
+  return ( succ )? Qtrue : Qfalse;
 }
 
 
 void Init_topology( void ) {
   mTopology = rb_define_module_under( mTrema, "Topology" );
 
-  // @!group enum topology_switch_status_type
-  rb_define_const( mTopology, "TD_SWITCH_DOWN", TD_SWITCH_DOWN );
-  rb_define_const( mTopology, "TD_SWITCH_UP", TD_SWITCH_UP );
+  /* @!group enum topology_switch_status_type */
+  /* Same as C API enum topology_switch_status_type */
+  rb_define_const( mTopology, "TD_SWITCH_DOWN", INT2NUM( TD_SWITCH_DOWN ) );
+  /* Same as C API enum topology_switch_status_type */
+  rb_define_const( mTopology, "TD_SWITCH_UP", INT2NUM( TD_SWITCH_UP ) );
 
-  // @!group enum topology_port_status_type
-  rb_define_const( mTopology, "TD_PORT_DOWN", TD_PORT_DOWN );
-  rb_define_const( mTopology, "TD_PORT_UP", TD_PORT_UP );
-  // @!group enum topology_port_external_type
-  rb_define_const( mTopology, "TD_PORT_INACTIVE", TD_PORT_INACTIVE );
-  rb_define_const( mTopology, "TD_PORT_EXTERNAL", TD_PORT_EXTERNAL );
+  /* @!group enum topology_port_status_type */
+  /* Same as C API enum topology_port_status_type */
+  rb_define_const( mTopology, "TD_PORT_DOWN", INT2NUM( TD_PORT_DOWN ) );
+  /* Same as C API enum topology_port_status_type */
+  rb_define_const( mTopology, "TD_PORT_UP", INT2NUM( TD_PORT_UP ) );
 
-  // @!group enum topology_link_status_type
-  rb_define_const( mTopology, "TD_LINK_DOWN", TD_LINK_DOWN );
-  rb_define_const( mTopology, "TD_LINK_UP", TD_LINK_UP );
-  rb_define_const( mTopology, "TD_LINK_UNSTABLE", TD_LINK_UNSTABLE );
+  /* @!group enum topology_port_external_type */
+  /* Same as C API enum topology_port_external_type */
+  rb_define_const( mTopology, "TD_PORT_INACTIVE", INT2NUM( TD_PORT_INACTIVE ) );
+  /* Same as C API enum topology_port_external_type */
+  rb_define_const( mTopology, "TD_PORT_EXTERNAL", INT2NUM( TD_PORT_EXTERNAL ) );
 
-  // @!endgroup
+  /* @!group enum topology_link_status_type */
+  /* Same as C API enum topology_link_status_type */
+  rb_define_const( mTopology, "TD_LINK_DOWN", INT2NUM( TD_LINK_DOWN ) );
+  /* Same as C API enum topology_link_status_type */
+  rb_define_const( mTopology, "TD_LINK_UP", INT2NUM( TD_LINK_UP ) );
+  /* Same as C API enum topology_link_status_type */
+  rb_define_const( mTopology, "TD_LINK_UNSTABLE", INT2NUM( TD_LINK_UNSTABLE ) );
+  /* @!endgroup */
 
   rb_define_protected_method( mTopology, "init_libtopology", topology_init_libtopology, 1 );
   rb_define_protected_method( mTopology, "finalize_libtopology", topology_finalize_libtopology, 0 );
 
-  rb_define_protected_method( mTopology, "subscribe_topology", topology_subscribe_topology, 0 );
-  rb_define_protected_method( mTopology, "unsubscribe_topology", topology_unsubscribe_topology, 0 );
+  rb_define_method( mTopology, "send_subscribe_topology", topology_subscribe_topology, 0 );
+  rb_define_method( mTopology, "send_unsubscribe_topology", topology_unsubscribe_topology, 0 );
 
-  rb_define_method( mTopology, "enable_topology_discovery", topology_enable_topology_discovery, 0 );
-  rb_define_method( mTopology, "disable_topology_discovery", topology_disable_topology_discovery, 0 );
+  rb_define_method( mTopology, "send_enable_topology_discovery", topology_enable_topology_discovery, 0 );
+  rb_define_method( mTopology, "send_disable_topology_discovery", topology_disable_topology_discovery, 0 );
 
-  rb_define_method( mTopology, "send_all_link_status_request", topology_send_all_link_status, 0 );
-  rb_define_method( mTopology, "send_all_port_status_request", topology_send_all_port_status, 0 );
-  rb_define_method( mTopology, "send_all_switch_status_request", topology_send_all_switch_status, 0 );
+  rb_define_method( mTopology, "get_all_link_status", topology_send_all_link_status, 0 );
+  rb_define_method( mTopology, "get_all_port_status", topology_send_all_port_status, 0 );
+  rb_define_method( mTopology, "get_all_switch_status", topology_send_all_switch_status, 0 );
 
   rb_require( "trema/topology" );
 }

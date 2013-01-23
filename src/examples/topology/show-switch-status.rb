@@ -1,4 +1,19 @@
-require "trema/topology"
+#
+# Copyright (C) 2008-2013 NEC Corporation
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2, as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
 
 
 class ShowSwitchStatus < Controller
@@ -8,13 +23,13 @@ class ShowSwitchStatus < Controller
   oneshot_timer_event :timed_out, 15
   oneshot_timer_event :on_start, 0
   def on_start
-    send_all_switch_status_request
+    get_all_switch_status
   end
 
-  def all_switch_status_reply sw_status
+  def all_switch_status sw_status
     puts "Switch status"
     sw_status.each do | sw_hash |
-      sw = Topology::Switch[ sw_hash ]
+      sw = Topology::Switch.new( sw_hash )
 
       status_str = "unknown"
       if sw.up? then
@@ -25,13 +40,13 @@ class ShowSwitchStatus < Controller
       puts "  dpid : 0x#{sw.dpid.to_s(16)}, status : #{status_str}"
     end
 
-    send_all_port_status_request
+    get_all_port_status
   end
 
-  def all_port_status_reply port_status
+  def all_port_status port_status
     puts "Port status"
     port_status.each do | port_hash |
-      port = Port[ port_hash ]
+      port = Port.new( port_hash )
       status_str = "unknown"
       if port.up? then
         status_str = "up"

@@ -18,8 +18,6 @@
 
 require File.join( File.dirname( __FILE__ ), "..", "spec_helper" )
 require "trema"
-require "trema/topology"
-require "trema/topology/topology_cache"
 
 
 include Trema::Topology
@@ -27,9 +25,9 @@ include Trema::Topology
 describe Trema::Topology, :nosudo => true do
 
   describe Port do
-    it "should be initialized like Hash" do
+    it "should be initialized with Hash" do
       expect {
-        port = Port[ {:dpid => 0x1234, :portno => 42 } ]
+        port = Port.new( {:dpid => 0x1234, :portno => 42 } )
       }.not_to raise_error
     end
 
@@ -41,70 +39,65 @@ describe Trema::Topology, :nosudo => true do
 
     it "should raise error if key :dpid missing" do
       expect {
-        port = Port[ {:data => 0x1234, :portno => 42 } ]
+        port = Port.new( {:data => 0x1234, :portno => 42 } )
       }.to raise_error(ArgumentError)
     end
 
     it "should raise error if key :portno missing" do
       expect {
-        port = Port[ {:dpid => 0x1234, :number => 42 } ]
+        port = Port.new( {:dpid => 0x1234, :number => 42 } )
       }.to raise_error(ArgumentError)
     end
 
     it "should have dpid accessor" do
-      port = Port[ {:dpid => 0x1234, :portno => 42 } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42 } )
       expect( port.dpid ).to be == 0x1234
     end
 
     it "should have portno accessor" do
-      port = Port[ {:dpid => 0x1234, :portno => 42 } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42 } )
       expect( port.portno ).to be == 42
     end
 
     it "has method up?" do
-      port = Port[ {:dpid => 0x1234, :portno => 42, :up => true } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :up => true } )
       expect( port.up? ).to be_true
 
-      port = Port[ {:dpid => 0x1234, :portno => 42, :up => false } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :up => false } )
       expect( port.up? ).to be_false
 
-      port = Port[ {:dpid => 0x1234, :portno => 42 } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42 } )
       expect( port.up? ).to be_false
     end
 
     it "has method external?" do
-      port = Port[ {:dpid => 0x1234, :portno => 42, :external => TD_PORT_EXTERNAL } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :external => true } )
       expect( port.external? ).to be_true
 
-      port = Port[ {:dpid => 0x1234, :portno => 42, :external => TD_PORT_INACTIVE } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :external => false } )
       expect( port.external? ).to be_false
 
-      port = Port[ {:dpid => 0x1234, :portno => 42 } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42 } )
       expect( port.external? ).to be_false
     end
 
     it "has method name" do
-      port = Port[ {:dpid => 0x1234, :portno => 42, :name => "Port name" } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :name => "Port name" } )
       expect( port.name ).to eq( "Port name" )
     end
 
     it "has method mac" do
-      port = Port[ {:dpid => 0x1234, :portno => 42, :mac => "08:00:27:00:34:B7" } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :mac => "08:00:27:00:34:B7" } )
       expect( port.mac ).to eq( "08:00:27:00:34:B7" )
     end
 
     it "should have method key" do
-      port = Port[ {:dpid => 0x1234, :portno => 42 } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42 } )
       expect( port.key ).to be == [0x1234,42]
     end
 
-    it "should have method key_str" do
-      port = Port[ {:dpid => 0x1234, :portno => 42 } ]
-      expect( port.key_str ).to match("1234-42")
-    end
-
     it "should be serializable to human readable form by to_s" do
-      port = Port[ {:dpid => 0x1234, :portno => 42, :up => true, :not_used => 1 } ]
+      port = Port.new( {:dpid => 0x1234, :portno => 42, :up => true, :not_used => 1 } )
       expect( port.to_s ).to be == "Port: 0x1234:42 - {not_used:1, up:true}"
     end
   end

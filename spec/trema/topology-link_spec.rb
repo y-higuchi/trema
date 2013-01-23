@@ -18,8 +18,6 @@
 
 require File.join( File.dirname( __FILE__ ), "..", "spec_helper" )
 require "trema"
-require "trema/topology"
-require "trema/topology/topology_cache"
 
 
 include Trema::Topology
@@ -27,9 +25,9 @@ include Trema::Topology
 describe Trema::Topology, :nosudo => true do
 
   describe Link do
-    it "should be initialized like Hash" do
+    it "should be initialized with Hash" do
       expect {
-        link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72  } ]
+        link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72  } )
       }.not_to raise_error
     end
 
@@ -41,82 +39,78 @@ describe Trema::Topology, :nosudo => true do
 
     it "should raise error if key :from_dpid missing" do
       expect {
-        link = Link[ {:from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+        link = Link.new( {:from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       }.to raise_error(ArgumentError)
     end
 
     it "should raise error if key :from_portno missing" do
       expect {
-        link = Link[ {:from_dpid => 0x1234, :to_dpid => 0x5678, :to_portno => 72 } ]
+        link = Link.new( {:from_dpid => 0x1234, :to_dpid => 0x5678, :to_portno => 72 } )
       }.to raise_error(ArgumentError)
     end
 
     it "should raise error if key :to_dpid missing" do
       expect {
-        link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_portno => 72 } ]
+        link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_portno => 72 } )
       }.to raise_error(ArgumentError)
     end
 
     it "should raise error if key :to_portno missing" do
       expect {
-        link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678 } ]
+        link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678 } )
       }.to raise_error(ArgumentError)
     end
 
     it "should have from_dpid accessor" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.from_dpid ).to be == 0x1234
     end
 
     it "should have from_dpid accessor" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.from_portno ).to be == 42
     end
 
+
     it "should have to_dpid accessor" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.to_dpid ).to be == 0x5678
     end
 
     it "should have to_dpid accessor" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.to_portno ).to be == 72
     end
 
     it "has method up?" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => true } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => true } )
       expect( link.up? ).to be_true
 
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => false } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => false } )
       expect( link.up? ).to be_false
 
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.up? ).to be_false
     end
 
     it "has method unstable?" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :unstable => true } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :unstable => true } )
       expect( link.unstable? ).to be_true
 
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :unstable => false } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :unstable => false } )
       expect( link.unstable? ).to be_false
 
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.unstable? ).to be_false
     end
 
     it "should have method key" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       expect( link.key ).to be == [0x1234,42,0x5678,72]
     end
 
-    it "should have method key_str" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } ]
-      expect( link.key_str ).to match("1234-42-5678-72")
-    end
-
     it "should be serializable to human readable form by to_s" do
-      link = Link[ {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => true, :not_used => 1 } ]
+      link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72, :up => true, :not_used => 1 } )
       expect( link.to_s ).to be == "Link: (0x1234:42)->(0x5678:72) - {not_used:1, up:true}"
     end
   end

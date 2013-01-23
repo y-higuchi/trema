@@ -18,71 +18,66 @@
 
 module Trema
   module Topology
-    # Topology Cache structure
-    class Cache
-      # Hash of Switches: dpid => Switch
+    # Topology Map structure
+    class Map
+      # @return [{Integer=>Switch}]  Hash of Switches: dpid => Switch
       # @note Do not directly add/remove elements in this Hash.
       attr_reader :switches
-      # Hash of Links: [from.dpid, from.port_no, to.dpid, to.port_no] => Links
+      # @return [{[Integer,Integer,Integer,Integer]=>Link}] Hash of Links: [from.dpid, from.port_no, to.dpid, to.port_no] => Links
       # @note Do not directly add/remove elements in this Hash.
       attr_reader :links
-      # Create empty Cache
+      # Create empty Map
       def initialize
         @switches = Hash.new
-        @links = Hash.new;
+        @links = Hash.new
       end
 
       # @!group Switch manipulation methods
 
 
-      # Add a switch to topology cache.
+      # Add a switch to topology map.
       # @return [Switch] Switch instance added.
       def add_switch sw
         raise TypeError, "Trema::Topology::Switch expected" if not sw.is_a?(Switch)
-        @switches[ sw.dpid ] = sw;
+        @switches[ sw.dpid ] = sw
       end
 
 
-      # Delete a switch from Topology cache.
+      # Delete a switch from Topology map.
       # @note Links from/to the switch will also be removed
+      # @param [Switch,Hash] sw Switch instance or a Hash with Switch info
       def del_switch sw
-        del_switch_by_dpid sw.dpid
+        del_switch_by_dpid sw[:dpid]
       end
 
 
-      # Delete a switch from Topology cache using dpid
+      # Delete a switch from Topology map using dpid
       # @see #del_switch
       def del_switch_by_dpid dpid
         remove_links = @links.select { |key,_| (key[FROM_DPID] == dpid || key[TO_DPID] == dpid) }
-        remove_links.each { |kv_pair| self.del_link_by_key_tuple( kv_pair[0] ) }
+        remove_links.each { |kv_pair| self.del_link( kv_pair.first ) }
         @switches.delete dpid
       end
 
 
-      # Lookup a switch from Topology cache using dpid
-      # @param [Integer] dpid dpid of the switch to look for.
-      # @return [Switch,nil] Switch instance found, or nil if not found.
-      def lookup_switch_by_dpid dpid
-        @switches[dpid]
-      end
-
-
-      # Get a switch from Topology cache using dpid.
+      # Get a switch from Topology map using dpid.
       # Switch instance will be created if not found.
       # @param [Integer] dpid dpid of the switch to look for.
       # @return [Switch] Switch instance for specified dpid
       def get_switch_for_dpid dpid
         sw = lookup_switch_by_dpid dpid
-        sw ||= add_switch Switch[ { :dpid => dpid } ]
+        sw ||= add_switch Switch.new( { :dpid => dpid } )
         return sw
       end
 
       # @!group Link manipulation methods
 
 
-      # Add a link to Topology cache.
+      # Add a link to Topology map.
       # @note Corresponding Switch object's links_out, links_in will also be updated.
       def add_link link
+        raise TypeError, "Trema::Topology::Link expected" if not link.is_a?(Link)
+
         key = link.key
         key.each { |each| each.freeze }
         key.freeze
@@ -90,55 +85,65 @@ module Trema
         sw_from = get_switch_for_dpid link.from_dpid
         sw_to = get_switch_for_dpid  link.to_dpid
 
-        sw_from.add_outbound_link link
-        sw_to.add_inbound_link link
+        sw_from.add_link link
+        sw_to.add_link link
         @links[ key ] = link
       end
 
 
-      # Delete a link from Topology cache.
+      # Delete a link from Topology map.
       # @note Corresponding Switch object's links_out, links_in will also be updated.
+      # @param [Link,Hash] link Link instance or a Hash with link info.
       def del_link link
-        del_link_by_key_tuple [link.from_dpid, link.from_portno, link.to_dpid, link.to_portno ]
+        del_link_by_key [ link[:from_dpid], link[:from_portno], link[:to_dpid], link[:to_portno] ]
       end
 
 
-      # Delete a link from Topology cache.
-      def del_link_by_key_elements from_dpid, from_portno, to_dpid, to_portno
-        del_link_by_key_tuple [from_dpid, from_portno, to_dpid, to_portno ]
-      end
-
-
-      # Delete a link from Topology cache.
+      # Delete a link from Topology map.
       # @param [Array(Integer,Integer,Integer,Integer)] key
       #   4 element array. [from.dpid, from.port_no, to.dpid, to.port_no]
-      def del_link_by_key_tuple key
+      def del_link_by_key key
         sw_from = @switches[ key[FROM_DPID] ];
         sw_to = @switches[ key[TO_DPID] ];
 
-        sw_from.del_link_by_key( key ) if sw_from
-        sw_to.del_link_by_key( key ) if sw_to
+        sw_from.delete_link( key ) if sw_from
+        sw_to.delete_link( key ) if sw_to
         @links.delete( key )
       end
 
+      #
+      # @!group Lookup map contents
+      #
 
-      # Lookup a link from Topology cache.
+      # Lookup a switch from Topology map using dpid
+      # @param [Integer] dpid dpid of the switch to look for.
+      # @return [Switch] Switch instance found, or nil if not found.
+      def lookup_switch_by_dpid dpid
+        @switches[dpid]
+      end
+
+
+      # Lookup a link from Topology map.
       # @param [Hash] link look up a link instance using key elements listed in Options
-      # @option (see Link.[])
+      # @option (see Link#initialize)
+      # @return [Link] Link instance found, or nil if not found.
       def lookup_link_by_hash link
         key = [ link[:from_dpid], link[:from_portno], link[:to_dpid], link[:to_portno] ];
         return @links[ key ]
       end
 
-      # @!group Update by Hash methods
 
+      #
+      # @!group Update by Hash methods
+      #
 
       # Update Switch instance. Switch instance will be created if it does not exist.
       # Switch instance will be removed if the state is not up
-      # @param [Hash] sw switch instance info hash
-      # @option (see Switch.[])
-      def update_switch_by_hash sw
-        raise ArgumentError, "Key element for Switch missing in Hash" if not Switch.has_keys?( sw )
+      # @param [Switch,Hash] sw Switch instance or a Hash with switch info
+      # @option (see Switch#initialize)
+      def update_switch sw
+        sw = sw.property if sw.is_a?(Switch)
+        raise ArgumentError, "Mandatory key element for Switch missing in Hash" if not Switch.has_mandatory_keys?( sw )
 
         dpid = sw[:dpid]
         if sw[:up] then
@@ -146,7 +151,7 @@ module Trema
           if s != nil then
             s.update( sw )
           else
-            add_switch Switch[ sw ]
+            add_switch Switch.new( sw )
           end
         else
           del_switch_by_dpid dpid
@@ -156,43 +161,49 @@ module Trema
 
       # Update Link instance. Link instance will be created if it does not exist.
       # Link instance will be removed if the state is not up
-      # @param [Hash] link link instance info hash
-      # @option (see Link.[])
-      def update_link_by_hash link
-        raise ArgumentError, "Key element for Link missing in Hash" if not Link.has_keys?( link )
+      # @param [Link,Hash] link Link instance or a Hash with link info
+      # @option (see Link#initialize)
+      def update_link link
+        link = link.property if link.is_a?(Link)
+        raise ArgumentError, "Mandatory key element for Link missing in Hash" if not Link.has_mandatory_keys?( link )
 
         if link[:up] then
           l = lookup_link_by_hash( link )
           if l != nil then
             l.update( link )
           else
-            add_link Link[ link ]
+            add_link Link.new( link )
           end
         else
-          del_link_by_key_elements(link[:from_dpid],link[:from_portno],link[:to_dpid],link[:to_portno])
+          del_link link
         end
       end
 
 
       # Update Port instance. Port instance will be created if it does not exist.
       # Port instance will be removed if the state is not up
-      # @param [Hash] port port instance info hash
-      # @option (see Port.[])
-      def update_port_by_hash port
-        raise ArgumentError, "Key element for Port missing in Hash" if not Port.has_keys?( port )
+      # @param [Port,Hash] port Port instance or a Hash with port info
+      # @option (see Port#initialize)
+      def update_port port
+        port = port.property if port.is_a?(Port)
+        raise ArgumentError, "Mandatory key element for Port missing in Hash" if not Port.has_mandatory_keys?( port )
+        
         dpid = port[:dpid]
         s = lookup_switch_by_dpid( dpid )
         if port[:up] then
-          s ||= add_switch Switch[ { :dpid => dpid } ]
+          s ||= add_switch Switch.new( { :dpid => dpid } )
         end
-        s.update_port_by_hash( port ) if s != nil
+        s.update_port( port ) if s != nil
       end
-
-      # @endgroup
-
-
+      
+      #
+      # @!endgroup
+      #
+      
+      # Dump map info as a String
+      # @return [String] content of this map.
       def to_s
-        s = "Cache:\n"
+        s = "Map:\n"
         s << "(Empty)\n" if @switches.empty? and @links.empty?
         @switches.each_pair do |_, sw|
           s << sw.to_s
@@ -202,6 +213,7 @@ module Trema
         end
         return s
       end
+      
     end
   end
 end
