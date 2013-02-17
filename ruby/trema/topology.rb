@@ -220,7 +220,7 @@ module Trema
     #    def start
     #      init_libtopology "topology"
     #      send_subscribe_topology if topology_handler_implemented?
-    #
+    #      send_enable_topology_discovery if respond_to?( :link_status_updated )
     #      # your application's pre-start_trema() call initialization here.
     #    end
     #  end

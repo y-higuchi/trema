@@ -62,7 +62,7 @@ module Trema
       end
 
 
-      # @return [Array(Integer,Integer)] Port key 2-tuple for this Port instance
+      # @return [[Integer,Integer]] Port key 2-tuple for this Port instance
       def key
         return [dpid, portno]
       end
@@ -72,7 +72,6 @@ module Trema
       # @param [Hash] port Hash containing Port properties. Must at least contain keys listed in Options.
       # @option port [Integer] :dpid Switch dpid which this port belongs
       # @option port [Integer] :portno port number
-      # @return [Port]
       # @example
       #   port = Port.new( {:dpid => 1234, :portno => 42} )
       def initialize( port )
@@ -115,10 +114,11 @@ module Trema
 
 
       def property_to_s
-        kvp_ary = @property.select { |key,_| not Port.is_mandatory_key?( key ) }
-        kvp_ary = kvp_ary.sort_by { |key,_| key.to_s }
-        s = kvp_ary.map { |key, val| "#{key.to_s}:#{val.inspect}" }.join(", ")
-        return s
+        kvp_ary = @property.select { |key,_| not Port.is_mandatory_key?( key ) }. 
+          map { |key, val| [key.to_s, val] }. 
+          sort { |lhs,rhs| lhs.first <=> rhs.first }. 
+          map { |key, val| "#{key}:#{val.inspect}"} 
+        return kvp_ary.join(", ")
       end
     end
   end

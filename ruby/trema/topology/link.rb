@@ -70,7 +70,7 @@ module Trema
       end
 
 
-      # @return [Array(Integer,Integer,Integer,Integer)] Link key 4-tuple for this Link instance
+      # @return [[Integer,Integer,Integer,Integer]] Link key 4-tuple for this Link instance
       def key
         return [ from_dpid, from_portno, to_dpid, to_portno ]
       end
@@ -82,7 +82,6 @@ module Trema
       # @option link [Integer] :from_portno port number of switch which this link departs from
       # @option link [Integer] :to_dpid Switch dpid which this link peer to
       # @option link [Integer] :to_portno port number of switch which this link peer to
-      # @return [Link]
       # @example
       #   link = Link.new( {:from_dpid => 0x1234, :from_portno => 42, :to_dpid => 0x5678, :to_portno => 72 } )
       def initialize( link )
@@ -125,10 +124,11 @@ module Trema
 
 
       def property_to_s
-        kvp_ary = @property.select { |key,_| not Link.is_mandatory_key?( key ) }
-        kvp_ary = kvp_ary.sort_by { |key,_| key.to_s }
-        s = kvp_ary.map { |key, val| "#{key.to_s}:#{val.inspect}" }.join(", ")
-        return s
+        kvp_ary = @property.select { |key,_| not Link.is_mandatory_key?( key ) }. 
+          map { |key, val| [key.to_s, val] }. 
+          sort { |lhs,rhs| lhs.first <=> rhs.first }. 
+          map { |key, val| "#{key}:#{val.inspect}"} 
+        return kvp_ary.join(", ")
       end
     end
   end

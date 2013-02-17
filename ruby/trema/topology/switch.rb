@@ -57,10 +57,12 @@ module Trema
 
       # Add a port on this Switch.
       # @param [Port] port Port instance to add to switch
+      # @return self
       def add_port port
         raise TypeError, "Trema::Topology::Port expected" if not port.is_a?(Port)
         raise ArgumentError, "dpid mismatch. 0x#{ self.dpid.to_s(16) } expected but received: 0x#{ port.dpid.to_s(16) }" if ( self.dpid != port.dpid )
         @ports[ port.portno ] = port
+          return self
       end
 
 
@@ -68,10 +70,13 @@ module Trema
       # It will be silently ignored if the port did not belong to this switch
       # @overload delete_port port
       #   @param [Port] port Port instance to delete
+      #   @return self
       # @overload delete_port port_hash
       #   @param [Hash] port_hash a Hash with port info about instance to delete
+      #   @return self
       # @overload delete_port portno
       #   @param [Integer] portno portno of instance to delete
+      #   @return self
       def delete_port port
         if port.is_a?(Port)
           @ports.delete( port.portno )
@@ -82,15 +87,18 @@ module Trema
         else
           raise TypeError, "Either Port, Port info(Hash), portno(Integer) expected"
         end
+        return self
       end
 
 
       # Add a link to this Switch.
       # It will be silently ignored if the link was not bound to this switch
       # @param [Link] link link to add.
+      # @return self
       def add_link link
         @links_in[ link.key ] = link if link.to_dpid == self.dpid
         @links_out[ link.key ] = link if link.from_dpid == self.dpid
+        return self
       end
 
 
@@ -98,10 +106,13 @@ module Trema
       # It will be silently ignored if the link was not bound to this switch
       # @overload delete_link link
       #   @param [Port] port Link instance to delete
+      #   @return self
       # @overload delete_link link_hash
       #   @param [Hash] port_hash a Hash with link info about instance to delete
+      #   @return self
       # @overload delete_link key
       #   @param [[Integer, Integer, Integer, Integer]] key Link key 4-tuple of the link to delete
+      #   @return self
       def delete_link link
         if link.is_a?(Link)
           key = link.key
@@ -118,6 +129,7 @@ module Trema
         else
           raise TypeError, "Either Link, Link info(Hash), Link key tuple([Integer,Integer,Integer,Integer]) expected"
         end
+        return self
       end
 
 
@@ -126,8 +138,7 @@ module Trema
       #   @param [Hash] sw_hash a Hash containing Switch properties. Must at least contain keys listed in Options.
       #   @option sw_hash [Integer] :dpid Switch dpid
       # @overload initialize dpid
-      #     @param [Integer] dpid datapath_id  
-      # @return Switch
+      #   @param [Integer] dpid datapath_id  
       # @example
       #  sw = Switch.new( {:dpid => 0x1234} )
       #  sw = Switch.new( 0x1234 )
@@ -184,10 +195,11 @@ module Trema
 
 
       def property_to_s
-        kvp_ary = @property.select { |key,_| not Switch.is_mandatory_key?( key ) }
-        kvp_ary = kvp_ary.sort_by { |key,_| key.to_s }
-        s = kvp_ary.map { |key, val| "#{key.to_s}:#{val.inspect}" }.join(", ")
-        return s
+        kvp_ary = @property.select { |key,_| not Switch.is_mandatory_key?( key ) }. 
+          map { |key, val| [key.to_s, val] }. 
+          sort { |lhs,rhs| lhs.first <=> rhs.first }. 
+          map { |key, val| "#{key}:#{val.inspect}"} 
+        return kvp_ary.join(", ")
       end
     end
   end

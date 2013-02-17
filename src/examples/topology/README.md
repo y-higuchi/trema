@@ -67,57 +67,6 @@ How to run (show_topology/show_switch_status)
         $ ./trema run src/examples/topology/show-switch-status.rb
 
 
-How to run (change-history.rb)
-------------------------------
-
-1. Change to trema directory and build trema, if you haven't done so already. 
-
-        $ cd $TREMA_HOME
-        $ ./build.rb
-
-2. Start topology daemon.
-
-        $ ./trema run -c src/examples/topology/change-history.conf &
-
-3. Run change-history.rb from trema run 
-
-        $ ./trema run src/examples/topology/change-history.rb
-
-4. Controller will output will be written to change-history.dot in current directory.
-
-        (In another terminal)
-        $ tail -F change-history.dot
-        digraph {
-          subgraph cluster0 {
-            graph [label="Gen 0\ninitial"];
-            "0x1_0" [label="0x1", color="green"];
-            "0x2_0" [label="0x2", color="green"];
-            "0x3_0" [label="0x3", color="green"];
-            "0x1_0" -> "0x2_0" [color="green"];
-            "0x1_0" -> "0x3_0" [color="green"];
-            "0x2_0" -> "0x3_0" [color="green"];
-            "0x3_0" -> "0x2_0" [color="green"];
-            "0x3_0" -> "0x1_0" [color="green"];
-            "0x2_0" -> "0x1_0" [color="green"];
-
-5. See how topology change is notified to dot file.
-   Example: stop switch with dpid 0x3
-
-        (In another terminal)
-        $ ./trema kill 0x3
-
-   Example: restart switch with dpid 0x3
-
-        $ ./trema up 0x3
-
-6. Graphically see topology change history.
-
-        $ dot -Tsvg -O change-history.dot
-        $ firefox change-history.dot.svg
-
-   You may need to install graphviz package to use dot command.
-
-        $ sudo apt-get install graphviz
 
 License & Terms
 ---------------

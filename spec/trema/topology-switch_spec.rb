@@ -78,14 +78,8 @@ describe Trema::Topology, :nosudo => true do
       s.add_port Port.new( { :dpid => 0x1234, :portno => 1 } )
       expect( s.ports[1] ).not_to be_nil
 
-      s.update_port( { :dpid => 0x1234, :portno => 3, :up => true } )
-      expect( s.ports[3] ).not_to be_nil
-
       s.delete_port Port.new( { :dpid => 0x1234, :portno => 2 } )
       expect( s.ports[2] ).to be_nil
-
-      s.update_port( { :dpid => 0x1234, :portno => 1, :up => false } )
-      expect( s.ports[1] ).to be_nil
     end
 
     it "should have link manipulation methods" do
