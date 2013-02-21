@@ -62,20 +62,27 @@ start_discovery_management( void ){
 
 
 static void
-send_flow_mod_receiving_lldp( const sw_entry *sw, uint16_t hard_timeout, uint16_t priority, bool add ) {
-  struct ofp_match match;
-  memset( &match, 0, sizeof( struct ofp_match ) );
+set_match_for_lldp( struct ofp_match *match ) {
+  assert( match != NULL );
+  memset( match, 0, sizeof( struct ofp_match ) );
   if ( !options.lldp.lldp_over_ip ) {
-    match.wildcards = OFPFW_ALL & ~OFPFW_DL_TYPE;
-    match.dl_type = ETH_ETHTYPE_LLDP;
+    match->wildcards = OFPFW_ALL & ~OFPFW_DL_TYPE;
+    match->dl_type = ETH_ETHTYPE_LLDP;
   }
   else {
-    match.wildcards = OFPFW_ALL & ~( OFPFW_DL_TYPE | OFPFW_NW_PROTO | OFPFW_NW_SRC_MASK | OFPFW_NW_DST_MASK );
-    match.dl_type = ETH_ETHTYPE_IPV4;
-    match.nw_proto = IPPROTO_ETHERIP;
-    match.nw_src = options.lldp.lldp_ip_src;
-    match.nw_dst = options.lldp.lldp_ip_dst;
+    match->wildcards = OFPFW_ALL & ~( OFPFW_DL_TYPE | OFPFW_NW_PROTO | OFPFW_NW_SRC_MASK | OFPFW_NW_DST_MASK );
+    match->dl_type = ETH_ETHTYPE_IPV4;
+    match->nw_proto = IPPROTO_ETHERIP;
+    match->nw_src = options.lldp.lldp_ip_src;
+    match->nw_dst = options.lldp.lldp_ip_dst;
   }
+}
+
+
+static void
+send_flow_mod_receiving_lldp( const sw_entry *sw, uint16_t hard_timeout, uint16_t priority, bool add ) {
+  struct ofp_match match;
+  set_match_for_lldp( &match );
 
   openflow_actions *actions = create_actions();
   const uint16_t max_len = UINT16_MAX;
@@ -223,9 +230,17 @@ handle_packet_in( uint64_t dst_datapath_id,
   probe_request( entry, PROBE_TIMER_EVENT_RECV_LLDP, &dst_datapath_id, dst_port_no );
 }
 
+static char PACKET_IN[] = "packet_in";
+static void
+handle_event_forward_entry_to_all_result( enum efi_result result, void *user_data ) {
+  if ( result == EFI_OPERATION_FAILED ) {
+    warn( "Registering/Unregistering topology to switch event  '%s' failed.", ( const char * ) user_data );
+  }
+}
+
 
 void
-enable_discovery( void ) {
+_enable_discovery( void ) {
   info( "Enabling topology discovery." );
   if ( g_discovery_enabled ) {
     warn( "Topology Discovery is already enabled." );
@@ -237,16 +252,19 @@ enable_discovery( void ) {
   // start receiving packet-in
   set_packet_in_handler( handle_packet_in, NULL );
 
+  // get event from all switches (directly)
+  add_event_forward_entry_to_all_switches( EVENT_FORWARD_TYPE_PACKET_IN, get_trema_name(), handle_event_forward_entry_to_all_result, PACKET_IN );
+
   set_switch_status_updated_hook( handle_switch_status_updated_callback, NULL );
   set_port_status_updated_hook( handle_port_status_updated_callback, NULL );
 
   // update all port status
   foreach_port_entry( port_entry_walker, NULL );
-
 }
+void (* enable_discovery )( void ) = _enable_discovery;
 
 void
-disable_discovery( void ) {
+_disable_discovery( void ) {
   if ( options.always_enabled ) return;
   info( "Disabling topology discovery." );
   if ( !g_discovery_enabled ) {
@@ -257,6 +275,9 @@ disable_discovery( void ) {
   // stop receiving packet-in
   set_packet_in_handler( ignore_packet_in, NULL );
 
+  // stop getting event from all switches (directly)
+  delete_event_forward_entry_to_all_switches( EVENT_FORWARD_TYPE_PACKET_IN, get_trema_name(), handle_event_forward_entry_to_all_result, PACKET_IN );
+
   // ignore switch/port events
   set_switch_status_updated_hook( NULL, NULL );
   set_port_status_updated_hook( NULL, NULL );
@@ -264,4 +285,5 @@ disable_discovery( void ) {
   // remove LLDP flow entry
   foreach_sw_entry( switch_del_LLDP_flow_mods, NULL );
 }
+void (* disable_discovery )( void ) = _disable_discovery;
 

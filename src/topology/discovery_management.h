@@ -35,8 +35,8 @@ bool start_discovery_management( void );
 /**
  * Enable discovery.
  */
-void enable_discovery( void );
-void disable_discovery( void );
+extern void (* enable_discovery )( void );
+extern void (* disable_discovery )( void );
 
 // TODO Future work: port masking API etc.
 

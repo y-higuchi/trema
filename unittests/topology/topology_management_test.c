@@ -32,6 +32,12 @@
  ********************************************************************************/
 
 
+#define  TEST_TREMA_NAME "test_topo_mgmt"
+
+// defined in trema.c
+extern void set_trema_name( const char *name );
+extern void _free_trema_name();
+
 /********************************************************************************
  * Mock functions.
  ********************************************************************************/
@@ -48,6 +54,7 @@
 static void ( *original_notify_switch_status_for_all_user )( sw_entry *sw );
 static void ( *original_notify_port_status_for_all_user )( port_entry *port );
 static void ( *original_notify_link_status_for_all_user )( port_entry *port );
+static bool ( *original_send_request_message )( const char *to_service_name, const char *from_service_name, const uint16_t tag, const void *data, size_t len, void *user_data );
 
 static int mock_notify_switch_status_for_all_user_calls = 0;
 static int mock_notify_switch_status_for_all_user_max = 0;
@@ -112,24 +119,173 @@ mock_notify_link_status_for_all_user( port_entry *port ) {
   check_expected( up );
 }
 
+
+static bool free_user_data_member = false;
+struct callback_info {
+  void *callback;
+  void *user_data;
+};
+struct event_forward_operation_to_all_request_param {
+  bool add;
+  enum efi_event_type type;
+  char* service_name;
+  event_forward_entry_to_all_callback callback;
+  void* user_data;
+};
+
+
+static bool
+mock_send_request_message( const char *to_service_name, const char *from_service_name,
+                           const uint16_t tag, const void *data, size_t len, void *user_data ) {
+  uint32_t tag32 = tag;
+  struct callback_info *hd = user_data;
+
+  check_expected( to_service_name );
+  check_expected( from_service_name );
+  check_expected( tag32 );
+  check_expected( data );
+  check_expected( len );
+  check_expected( hd->callback );
+  check_expected( hd->user_data );
+
+  bool sent_ok = ( bool ) mock();
+  if( sent_ok ) {
+    if ( free_user_data_member ) {
+      const management_application_request* mgmt = data;
+      switch ( htonl(mgmt->application_id) ) {
+      case EVENT_FORWARD_ENTRY_ADD:
+      case EVENT_FORWARD_ENTRY_DELETE:
+      case EVENT_FORWARD_ENTRY_DUMP:
+      case EVENT_FORWARD_ENTRY_SET:
+      {
+        struct event_forward_operation_to_all_request_param *p = hd->user_data;
+
+        xfree( p->service_name );
+        xfree( p );
+        hd->user_data = NULL;
+      }
+      break;
+      case EFI_GET_SWLIST:
+        // nothing to free
+        break;
+      default:
+        xfree( hd->user_data );
+        break;
+      }
+    }
+    xfree( hd );
+  }
+  return sent_ok;
+}
+
+
+static void
+expect_port_status_set() {
+  struct expected_data {
+    management_application_request mgmt;
+    event_forward_operation_request efi;
+    char topology[14+1];
+  } __attribute__( ( packed ) ) expected_data = {
+      .mgmt = {
+        .header = {
+            .type = htons( MANAGEMENT_APPLICATION_REQUEST ),
+            .length = htonl(sizeof( struct expected_data ) ),
+        },
+        .application_id = htonl(EVENT_FORWARD_ENTRY_ADD),
+      },
+      .efi = {
+          .type = EVENT_FORWARD_TYPE_PORT_STATUS,
+          .n_services = htonl( 1 ),
+      },
+      .topology = TEST_TREMA_NAME
+  };
+
+  expect_string( mock_send_request_message, to_service_name, "switch_manager.m" );
+  expect_any( mock_send_request_message, from_service_name );
+  expect_value( mock_send_request_message, tag32, MESSENGER_MANAGEMENT_REQUEST );
+  expect_memory( mock_send_request_message, data, &expected_data, sizeof( struct expected_data ) );
+  expect_value( mock_send_request_message, len, sizeof( struct expected_data ) );
+  expect_any( mock_send_request_message, hd->callback );
+  expect_any( mock_send_request_message, hd->user_data );
+  will_return( mock_send_request_message, true );
+}
+
+
+static void
+expect_state_notify_set() {
+  struct expected_data {
+    management_application_request mgmt;
+    event_forward_operation_request efi;
+    char topology[14+1];
+  } __attribute__( ( packed ) ) expected_data = {
+      .mgmt = {
+        .header = {
+            .type = htons( MANAGEMENT_APPLICATION_REQUEST ),
+            .length = htonl(sizeof( struct expected_data ) ),
+        },
+        .application_id = htonl(EVENT_FORWARD_ENTRY_ADD),
+      },
+      .efi = {
+          .type = EVENT_FORWARD_TYPE_STATE_NOTIFY,
+          .n_services = htonl( 1 ),
+      },
+      .topology = TEST_TREMA_NAME,
+  };
+
+  expect_string( mock_send_request_message, to_service_name, "switch_manager.m" );
+  expect_any( mock_send_request_message, from_service_name );
+  expect_value( mock_send_request_message, tag32, MESSENGER_MANAGEMENT_REQUEST );
+  expect_memory( mock_send_request_message, data, &expected_data, sizeof( struct expected_data ) );
+  expect_value( mock_send_request_message, len, sizeof( struct expected_data ) );
+  expect_any( mock_send_request_message, hd->callback );
+  expect_any( mock_send_request_message, hd->user_data );
+  will_return( mock_send_request_message, true );
+}
+
+
+static void
+expect_switch_list_request() {
+  struct expected_data {
+    management_application_request mgmt;
+  } __attribute__( ( packed ) ) expected_data = {
+      .mgmt = {
+        .header = {
+            .type = htons( MANAGEMENT_APPLICATION_REQUEST ),
+            .length = htonl(sizeof( struct expected_data ) ),
+        },
+        .application_id = htonl(EFI_GET_SWLIST),
+      },
+  };
+
+  expect_string( mock_send_request_message, to_service_name, "switch_manager.m" );
+  expect_any( mock_send_request_message, from_service_name );
+  expect_value( mock_send_request_message, tag32, MESSENGER_MANAGEMENT_REQUEST );
+  expect_memory( mock_send_request_message, data, &expected_data, sizeof( struct expected_data ) );
+  expect_value( mock_send_request_message, len, sizeof( struct expected_data ) );
+  expect_any( mock_send_request_message, hd->callback );
+  expect_any( mock_send_request_message, hd->user_data );
+  will_return( mock_send_request_message, true );
+}
+
 /********************************************************************************
  * Setup and teardown functions.
  ********************************************************************************/
 
 
-const char* OFA_SERVICE_NAME = "test_topo_mgmt.ofa";
-
-
 static void
 setup() {
+  set_trema_name( TEST_TREMA_NAME );
   init_messenger("/tmp");
   init_timer();
   init_stat();
-  init_openflow_application_interface( OFA_SERVICE_NAME );
+  init_openflow_application_interface( TEST_TREMA_NAME );
+  init_event_forward_interface();
 
   swap_original( notify_switch_status_for_all_user );
   swap_original( notify_port_status_for_all_user );
   swap_original( notify_link_status_for_all_user );
+  swap_original( send_request_message );
+  free_user_data_member = false;
   mock_notify_switch_status_for_all_user_calls = 0;
   mock_notify_switch_status_for_all_user_max = 0;
   mock_notify_port_status_for_all_user_calls = 0;
@@ -139,11 +295,13 @@ setup() {
 
 static void
 teardown() {
+  finalize_event_forward_interface();
   finalize_openflow_application_interface();
   finalize_timer();
   finalize_stat();
   finalize_messenger();
 
+  revert_original( send_request_message );
   revert_original( notify_switch_status_for_all_user );
   revert_original( notify_port_status_for_all_user );
   revert_original( notify_link_status_for_all_user );
@@ -151,6 +309,7 @@ teardown() {
   mock_notify_switch_status_for_all_user_max = 0;
   mock_notify_port_status_for_all_user_calls = 0;
   mock_notify_port_status_for_all_user_max = 0;
+  _free_trema_name();
 }
 
 
@@ -158,6 +317,10 @@ static void
 setup_topology_mgmt() {
   setup();
   assert_true( init_topology_management() );
+  free_user_data_member = true;
+  expect_port_status_set();
+  expect_state_notify_set();
+  expect_switch_list_request();
   assert_true( start_topology_management() );
 }
 
@@ -178,6 +341,10 @@ teardown_topology_mgmt() {
 static void
 test_init_start_finalize_topology_management() {
   assert_true( init_topology_management() );
+  free_user_data_member = true;
+  expect_port_status_set();
+  expect_state_notify_set();
+  expect_switch_list_request();
   assert_true( start_topology_management() );
   finalize_topology_management();
 }
@@ -210,7 +377,7 @@ test_receive_switch_ready_then_notify_sw_status_and_request_features() {
   data.datapath_id = htonll( 0x1234 );
   data.service_name_length = 0;
   const size_t len = sizeof( openflow_service_header_t );
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_READY, &data, len ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_READY, &data, len ) );
 
   // check notify to service mgmt
   expect_value( mock_notify_switch_status_for_all_user, datapath_id, 0x1234 );
@@ -295,7 +462,7 @@ test_feature_reply_then_update_ports() {
   port5->port_no = htons( OFPP_FLOOD );
   port5->state = htonl( OFPPS_LINK_DOWN );
 
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
   free_buffer( buf );
 
   // check notify to service mgmt
@@ -362,7 +529,7 @@ test_receive_switch_disconnected_then_notify_sw_status() {
   data.datapath_id = htonll( 0x1234 );
   data.service_name_length = 0;
   const size_t len = sizeof( openflow_service_header_t );
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_DISCONNECTED, &data, len ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_DISCONNECTED, &data, len ) );
 
   // check notify to service mgmt
   expect_value( mock_notify_link_status_for_all_user, from_dpid, 0x1234 );
@@ -434,7 +601,7 @@ test_receive_port_add_status_then_notify_port_status() {
   port_status->desc.config = htonl( OFPPC_PORT_DOWN );
   sprintf( port_status->desc.name, "Added port" );
 
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
   free_buffer( buf );
 
   // check notify to service mgmt
@@ -506,7 +673,7 @@ test_receive_port_del_status_then_notify_port_status() {
   port_status->desc.state = htonl( 0 );
   sprintf( port_status->desc.name, "Port removed" );
 
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
   free_buffer( buf );
 
   // check notify to service mgmt
@@ -579,7 +746,7 @@ test_receive_port_mod_status_then_notify_port_status() {
   port_status->desc.state = htonl( OFPPS_LINK_DOWN );
   sprintf( port_status->desc.name, "Port changed" );
 
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
   free_buffer( buf );
 
   // check notify to service mgmt
@@ -654,7 +821,7 @@ test_receive_port_mod_status_port_no_then_notify_port_status() {
   port_status->desc.port_no = htons( 3 );
   sprintf( port_status->desc.name, "Port changed" );
 
-  assert_true( send_message( OFA_SERVICE_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
+  assert_true( send_message( TEST_TREMA_NAME, MESSENGER_OPENFLOW_MESSAGE, buf->data, buf->length ) );
   free_buffer( buf );
 
   // check notify to service mgmt

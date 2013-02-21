@@ -113,7 +113,12 @@ static void
 handle_switch_ready( uint64_t datapath_id, void *user_data ) {
   UNUSED( user_data );
 
-  sw_entry *sw = update_sw_entry( &datapath_id );
+  sw_entry *sw = lookup_sw_entry( &datapath_id );
+  if ( sw != NULL ) {
+    warn( "Received switch-ready event, but switch(%#" PRIx64 ") already exists.", datapath_id );
+  } else {
+    sw = update_sw_entry( &datapath_id );
+  }
   sw->up = true;
   info( "Switch(%#" PRIx64 ") is connected.", datapath_id );
 
@@ -261,6 +266,30 @@ handle_port_status( uint64_t datapath_id, uint32_t transaction_id, uint8_t reaso
 }
 
 
+static char PORT_STATUS[] = "port_status";
+static char STATE_NOTIFY[] = "state_notify";
+static void
+handle_event_forward_entry_to_all_result( enum efi_result result, void *user_data ) {
+  if ( result == EFI_OPERATION_FAILED ) {
+    error( "Registering topology to switch event  '%s' failed.", ( const char * ) user_data );
+  }
+}
+
+
+static void
+emulate_initial_switch_ready( uint64_t* dpids, size_t n_dpids, void *user_data ) {
+  UNUSED( user_data );
+  if( dpids == NULL ) {
+    error( "Failed to get initial switch lists" );
+    return;
+  }
+
+  for ( size_t i = 0 ; i < n_dpids ; ++i ) {
+    handle_switch_ready( dpids[i], NULL );
+  }
+}
+
+
 bool
 init_topology_management( void ) {
   bool result = true;
@@ -281,6 +310,9 @@ finalize_topology_management( void ) {
 
 bool
 start_topology_management( void ) {
+  add_event_forward_entry_to_all_switches( EVENT_FORWARD_TYPE_PORT_STATUS, get_trema_name(), handle_event_forward_entry_to_all_result, PORT_STATUS );
+  add_event_forward_entry_to_all_switches( EVENT_FORWARD_TYPE_STATE_NOTIFY, get_trema_name(), handle_event_forward_entry_to_all_result, STATE_NOTIFY );
+  send_efi_switch_list_request( emulate_initial_switch_ready, NULL );
   return true;
 }
 

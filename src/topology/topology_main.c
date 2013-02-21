@@ -45,6 +45,8 @@ main( int argc, char *argv[] ) {
 
   init_openflow_application_interface( get_trema_name() );
 
+  init_event_forward_interface();
+
   info( "Initializing topology services");
   init_topology_table();
 
@@ -65,6 +67,8 @@ main( int argc, char *argv[] ) {
   finalize_topology_management();
 
   finalize_topology_table();
+
+  finalize_event_forward_interface();
 
   return 0;
 }

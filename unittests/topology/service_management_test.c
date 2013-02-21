@@ -46,6 +46,12 @@ extern void _free_trema_name();
 // defined in service_management.c
 extern void ping_all_subscriber(void* user_data );
 
+//defined in discovery_manager.h
+extern void _enable_discovery( void );
+extern void _disable_discovery( void );
+extern void (* enable_discovery )( void );
+extern void (* disable_discovery )( void );
+
 /********************************************************************************
  * Mock functions.
  ********************************************************************************/
@@ -63,6 +69,7 @@ static bool ( *original_add_message_replied_callback )( const char *service_name
 static bool ( *original_add_periodic_event_callback )( const time_t seconds, timer_callback callback, void *user_data );
 
 static uint8_t ( *original_set_discovered_link_status )( topology_update_link_status* link_status );
+
 
 static bool
 mock_add_message_requested_callback( const char *service_name,
@@ -438,6 +445,17 @@ mock_execute_timer_events( int *next_timeout_usec ) {
 }
 
 
+static void
+mock_enable_discovery() {
+
+}
+
+
+static void
+mock_disable_discovery() {
+
+}
+
 /********************************************************************************
  * Setup and teardown functions.
  ********************************************************************************/
@@ -467,6 +485,8 @@ teardown_fake_messenger() {
 
 static void
 setup_service_management() {
+  enable_discovery = _enable_discovery;
+  disable_discovery = _disable_discovery;
   set_trema_name( TEST_TREMA_NAME );
 
   service_management_options options = {
@@ -999,7 +1019,7 @@ test_ping_ageout_subscriber() {
 
 
 static void
-test_subscribe_from_client() {
+test_recv_subscribe_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
@@ -1030,6 +1050,7 @@ test_subscribe_from_client() {
   assert_true( e != NULL );
   assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
 
+  // clean up
   delete_subscriber_entry( e );
 
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
@@ -1042,7 +1063,7 @@ test_subscribe_from_client() {
 
 
 static void
-test_subscribe_from_subscribed_client_return_already_subscribed() {
+test_recv_subscribe_from_subscribed_client_return_already_subscribed() {
   // note: setup/teardown differ from test_subscribe_from_client()
 
   // avoid periodic ping event from running.
@@ -1075,6 +1096,7 @@ test_subscribe_from_subscribed_client_return_already_subscribed() {
   assert_true( e != NULL );
   assert_string_equal( e->name, TEST_SUBSCRIBER_NAME );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -1085,7 +1107,7 @@ test_subscribe_from_subscribed_client_return_already_subscribed() {
 
 
 static void
-test_unsubscribe_from_client() {
+test_recv_unsubscribe_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
@@ -1094,11 +1116,10 @@ test_unsubscribe_from_client() {
   init_timer();
 
   assert_true( add_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
-//  assert_true( add_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
 
   start_service_management();
 
-  // check subscriber table
+  // prepare subscriber table
   assert_true( insert_subscriber_entry( TEST_SUBSCRIBER_NAME ) );
   subscriber_entry* e = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( e != NULL );
@@ -1123,8 +1144,8 @@ test_unsubscribe_from_client() {
   subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( ea == NULL );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
-//  assert_true( delete_message_received_callback( TEST_CONTROL_NAME, callback_test_control_notification_handler ) );
 
   finalize_timer();
   finalize_messenger();
@@ -1134,7 +1155,7 @@ test_unsubscribe_from_client() {
 
 
 static void
-test_unsubscribe_from_unsubscribed_client_return_no_such_subscriber() {
+test_recv_unsubscribe_from_unsubscribed_client_return_no_such_subscriber() {
   // note: setup/teardown differ from test_subscribe_from_client()
 
   // avoid periodic ping event from running.
@@ -1169,6 +1190,7 @@ test_unsubscribe_from_unsubscribed_client_return_no_such_subscriber() {
   subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( ea == NULL );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -1179,10 +1201,12 @@ test_unsubscribe_from_unsubscribed_client_return_no_such_subscriber() {
 
 
 static void
-test_enable_discovery_from_client() {
+test_recv_enable_discovery_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
+
+  enable_discovery = mock_enable_discovery;
 
   init_messenger( "/tmp" );
   init_timer();
@@ -1215,6 +1239,7 @@ test_enable_discovery_from_client() {
   assert_string_equal( ea->name, TEST_SUBSCRIBER_NAME );
   assert_true( ea->use_discovery );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -1225,10 +1250,12 @@ test_enable_discovery_from_client() {
 
 
 static void
-test_enable_discovery_from_client_when_already_enabled() {
+test_recv_enable_discovery_from_client_when_already_enabled() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
+
+  enable_discovery = mock_enable_discovery;
 
   init_messenger( "/tmp" );
   init_timer();
@@ -1261,6 +1288,7 @@ test_enable_discovery_from_client_when_already_enabled() {
   assert_string_equal( ea->name, TEST_SUBSCRIBER_NAME );
   assert_true( ea->use_discovery );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -1271,10 +1299,12 @@ test_enable_discovery_from_client_when_already_enabled() {
 
 
 static void
-test_enable_discovery_from_unsubscribed_client() {
+test_recv_enable_discovery_from_unsubscribed_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
+
+  enable_discovery = mock_enable_discovery;
 
   init_messenger( "/tmp" );
   init_timer();
@@ -1305,6 +1335,7 @@ test_enable_discovery_from_unsubscribed_client() {
   assert_string_equal( ea->name, TEST_SUBSCRIBER_NAME );
   assert_true( ea->use_discovery );
 
+  // clean up
   delete_subscriber_entry( ea );
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
@@ -1316,10 +1347,12 @@ test_enable_discovery_from_unsubscribed_client() {
 
 
 static void
-test_disable_discovery_from_client() {
+test_recv_disable_discovery_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
+
+  disable_discovery = mock_disable_discovery;
 
   init_messenger( "/tmp" );
   init_timer();
@@ -1352,6 +1385,7 @@ test_disable_discovery_from_client() {
   assert_string_equal( ea->name, TEST_SUBSCRIBER_NAME );
   assert_false( ea->use_discovery );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -1362,10 +1396,12 @@ test_disable_discovery_from_client() {
 
 
 static void
-test_disable_discovery_from_unsubscribed_client() {
+test_recv_disable_discovery_from_unsubscribed_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
+
+  disable_discovery = mock_disable_discovery;
 
   init_messenger( "/tmp" );
   init_timer();
@@ -1394,6 +1430,7 @@ test_disable_discovery_from_unsubscribed_client() {
   subscriber_entry* ea = lookup_subscriber_entry( TEST_SUBSCRIBER_NAME );
   assert_true( ea == NULL );
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -1404,7 +1441,7 @@ test_disable_discovery_from_unsubscribed_client() {
 
 
 static void
-test_query_switch_status_from_client() {
+test_recv_query_switch_status_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
@@ -1429,7 +1466,7 @@ test_query_switch_status_from_client() {
                         buf->data, buf->length, NULL );
   free_buffer( buf );
 
-
+  // check reply
   expect_value( mock_query_switch_status_reply, number_of_switches, 1 );
   expect_value( mock_query_switch_status_reply, status, TD_SWITCH_DOWN );
   expect_value( mock_query_switch_status_reply, dpid, 0x1234 );
@@ -1437,6 +1474,7 @@ test_query_switch_status_from_client() {
   start_event_handler();
   start_messenger();
 
+  // clean up
   delete_sw_entry( sw );
 
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
@@ -1449,7 +1487,7 @@ test_query_switch_status_from_client() {
 
 
 static void
-test_query_port_status_from_client() {
+test_recv_query_port_status_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
@@ -1480,7 +1518,7 @@ test_query_port_status_from_client() {
                         buf->data, buf->length, NULL );
   free_buffer( buf );
 
-
+  // check reply
   expect_value( mock_query_port_status_reply, number_of_ports, 1 );
   expect_value( mock_query_port_status_reply, status, TD_PORT_DOWN );
   expect_value( mock_query_port_status_reply, dpid, 0x1234 );
@@ -1492,6 +1530,7 @@ test_query_port_status_from_client() {
   start_event_handler();
   start_messenger();
 
+  // clean up
   delete_port_entry( sw, port );
   delete_sw_entry( sw );
 
@@ -1505,7 +1544,7 @@ test_query_port_status_from_client() {
 
 
 static void
-test_query_link_status_from_client() {
+test_recv_query_link_status_from_client() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
@@ -1561,7 +1600,7 @@ test_query_link_status_from_client() {
                         buf->data, buf->length, NULL );
   free_buffer( buf );
 
-
+  // check reply
   expect_value( mock_query_link_status_reply, number_of_links, 3 );
 
   expect_value( mock_query_link_status_reply, status, TD_LINK_DOWN );
@@ -1586,6 +1625,7 @@ test_query_link_status_from_client() {
   start_event_handler();
   start_messenger();
 
+  // clean up
   delete_link_to( port );
   delete_link_to( port2 );
   delete_port_entry( sw, port );
@@ -1646,14 +1686,13 @@ test_set_discovered_link_status() {
   link_status.to_portno = 72;
   link_status.status = TD_LINK_UP;
 
-
+  // check called handlers
   expect_value( mock_link_status_notification, from_dpid, 0x1234 );
   expect_value( mock_link_status_notification, from_portno, 42 );
   expect_value( mock_link_status_notification, to_dpid, 0x5678 );
   expect_value( mock_link_status_notification, to_portno, 72 );
   expect_value( mock_link_status_notification, status, TD_LINK_UP );
   will_return( mock_link_status_notification, END_ON_RETURN );
-
 
   expect_value( local_link_status_updated_handler, user_data, NULL );
   expect_not_value( local_link_status_updated_handler, sw, NULL );
@@ -1666,12 +1705,14 @@ test_set_discovered_link_status() {
   expect_value( local_link_status_updated_handler, link_port_no, 72 );
   expect_value( local_link_status_updated_handler, link_up, true );
 
+  // set links
   uint8_t result = set_discovered_link_status( &link_status );
   assert_int_equal( result, TD_RESPONSE_OK );
 
   start_event_handler();
   start_messenger();
 
+  // clean up
   delete_link_to( port );
   delete_link_to( port2 );
   delete_port_entry( sw, port );
@@ -1731,7 +1772,7 @@ test_set_discovered_link_status_port_external() {
   link_status.to_portno = 72;
   link_status.status = TD_LINK_DOWN;
 
-
+  // check called handlers
   expect_value( mock_link_status_notification, from_dpid, 0x1234 );
   expect_value( mock_link_status_notification, from_portno, 42 );
   expect_value( mock_link_status_notification, to_dpid, 0x5678 );
@@ -1746,7 +1787,6 @@ test_set_discovered_link_status_port_external() {
   expect_value( mock_port_status_notification, external, TD_PORT_EXTERNAL );
   expect_value( mock_port_status_notification, status, TD_PORT_UP );
   will_return( mock_port_status_notification, END_ON_RETURN );
-
 
   expect_value( local_link_status_updated_handler, user_data, NULL );
   expect_not_value( local_link_status_updated_handler, sw, NULL );
@@ -1767,13 +1807,14 @@ test_set_discovered_link_status_port_external() {
   expect_value( local_port_status_updated_handler, up, true );
   expect_value( local_port_status_updated_handler, external, true );
 
-
+  // set links
   uint8_t result = set_discovered_link_status( &link_status );
   assert_int_equal( result, TD_RESPONSE_OK );
 
   start_event_handler();
   start_messenger();
 
+  // clean up
   delete_link_to( port );
   delete_link_to( port2 );
   delete_port_entry( sw, port );
@@ -1833,14 +1874,13 @@ test_set_discovered_link_status_linkchange() {
   link_status.to_portno = 72;
   link_status.status = TD_LINK_UP;
 
-
+  // check called handlers
   expect_value( mock_link_status_notification, from_dpid, 0x1234 );
   expect_value( mock_link_status_notification, from_portno, 42 );
   expect_value( mock_link_status_notification, to_dpid, 0x5678 );
   expect_value( mock_link_status_notification, to_portno, 72 );
   expect_value( mock_link_status_notification, status, TD_LINK_UP );
   will_return( mock_link_status_notification, END_ON_RETURN );
-
 
   expect_value( local_link_status_updated_handler, user_data, NULL );
   expect_not_value( local_link_status_updated_handler, sw, NULL );
@@ -1853,12 +1893,14 @@ test_set_discovered_link_status_linkchange() {
   expect_value( local_link_status_updated_handler, link_port_no, 72 );
   expect_value( local_link_status_updated_handler, link_up, true );
 
+  // set links
   uint8_t result = set_discovered_link_status( &link_status );
   assert_int_equal( result, TD_RESPONSE_OK );
 
   start_event_handler();
   start_messenger();
 
+  // clean up
   delete_link_to( port );
   delete_link_to( port2 );
   delete_port_entry( sw, port );
@@ -1912,10 +1954,12 @@ test_set_discovered_link_status_on_down_port_fail() {
   link_status.to_portno = 72;
   link_status.status = TD_LINK_UP;
 
-
+  // set links
   uint8_t result = set_discovered_link_status( &link_status );
+  // check call to fail
   assert_int_equal( result, TD_RESPONSE_INVALID );
 
+  // clean up
   delete_link_to( port );
   delete_link_to( port2 );
   delete_port_entry( sw, port );
@@ -1947,10 +1991,12 @@ test_set_discovered_link_status_on_invalid_port_fail() {
   link_status.to_portno = 72;
   link_status.status = TD_LINK_UP;
 
-
+  // set links
   uint8_t result = set_discovered_link_status( &link_status );
+  // check call to fail
   assert_int_equal( result, TD_RESPONSE_INVALID );
 
+  // clean up
   delete_sw_entry( sw );
 
   assert_true( set_port_status_updated_hook( NULL, NULL ) );
@@ -1972,8 +2018,9 @@ test_set_discovered_link_status_on_invalid_switch_fail() {
   link_status.to_portno = 72;
   link_status.status = TD_LINK_UP;
 
-
+  // set link
   uint8_t result = set_discovered_link_status( &link_status );
+  // check call to fail
   assert_int_equal( result, TD_RESPONSE_INVALID );
 
   assert_true( set_port_status_updated_hook( NULL, NULL ) );
@@ -1982,7 +2029,7 @@ test_set_discovered_link_status_on_invalid_switch_fail() {
 
 
 static void
-test_update_link_status_request() {
+test_recv_update_link_status_request() {
   // avoid periodic ping event from running.
   void ( *original_execute_timer_events )( int *next_timeout_usec );
   swap_original( execute_timer_events );
@@ -2005,6 +2052,7 @@ test_update_link_status_request() {
   req->to_portno = htons( 72 );
   req->status = TD_LINK_UP;
 
+  // check internal API call
   expect_value( mock_set_discovered_link_status, from_dpid, 0x1234 );
   expect_value( mock_set_discovered_link_status, from_portno, 42 );
   expect_value( mock_set_discovered_link_status, to_dpid, 0x5678 );
@@ -2021,6 +2069,7 @@ test_update_link_status_request() {
   start_event_handler();
   start_messenger();
 
+  // clean up
   assert_true( delete_message_replied_callback( TEST_SUBSCRIBER_NAME, callback_fake_libtopology_client_reply_end ) );
 
   finalize_timer();
@@ -2068,22 +2117,22 @@ main() {
       unit_test_setup_teardown( test_ping_subscriber, setup_fake_subscriber, teardown_fake_subscriber ),
       unit_test_setup_teardown( test_ping_ageout_subscriber, setup_fake_messenger, teardown_fake_messenger ),
 
-      unit_test_setup_teardown( test_subscribe_from_client, setup_service_management, teardown_service_management ),
-      unit_test_setup_teardown( test_subscribe_from_subscribed_client_return_already_subscribed, setup_fake_subscriber, teardown_fake_subscriber ),
+      unit_test_setup_teardown( test_recv_subscribe_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_subscribe_from_subscribed_client_return_already_subscribed, setup_fake_subscriber, teardown_fake_subscriber ),
 
-      unit_test_setup_teardown( test_unsubscribe_from_client, setup_service_management, teardown_service_management ),
-      unit_test_setup_teardown( test_unsubscribe_from_unsubscribed_client_return_no_such_subscriber, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_unsubscribe_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_unsubscribe_from_unsubscribed_client_return_no_such_subscriber, setup_service_management, teardown_service_management ),
 
-      unit_test_setup_teardown( test_enable_discovery_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
-      unit_test_setup_teardown( test_enable_discovery_from_client_when_already_enabled, setup_fake_subscriber, teardown_fake_subscriber ),
-      unit_test_setup_teardown( test_enable_discovery_from_unsubscribed_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_enable_discovery_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
+      unit_test_setup_teardown( test_recv_enable_discovery_from_client_when_already_enabled, setup_fake_subscriber, teardown_fake_subscriber ),
+      unit_test_setup_teardown( test_recv_enable_discovery_from_unsubscribed_client, setup_service_management, teardown_service_management ),
 
-      unit_test_setup_teardown( test_disable_discovery_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
-      unit_test_setup_teardown( test_disable_discovery_from_unsubscribed_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_disable_discovery_from_client, setup_fake_subscriber, teardown_fake_subscriber ),
+      unit_test_setup_teardown( test_recv_disable_discovery_from_unsubscribed_client, setup_service_management, teardown_service_management ),
 
-      unit_test_setup_teardown( test_query_switch_status_from_client, setup_service_management, teardown_service_management ),
-      unit_test_setup_teardown( test_query_port_status_from_client, setup_service_management, teardown_service_management ),
-      unit_test_setup_teardown( test_query_link_status_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_query_switch_status_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_query_port_status_from_client, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_query_link_status_from_client, setup_service_management, teardown_service_management ),
 
       unit_test_setup_teardown( test_set_discovered_link_status, setup_fake_subscriber, teardown_fake_subscriber ),
       unit_test_setup_teardown( test_set_discovered_link_status_port_external, setup_fake_subscriber, teardown_fake_subscriber ),
@@ -2092,7 +2141,7 @@ main() {
       unit_test_setup_teardown( test_set_discovered_link_status_on_invalid_port_fail, setup_fake_subscriber, teardown_fake_subscriber ),
       unit_test_setup_teardown( test_set_discovered_link_status_on_invalid_switch_fail, setup_fake_subscriber, teardown_fake_subscriber ),
 
-      unit_test_setup_teardown( test_update_link_status_request, setup_service_management, teardown_service_management ),
+      unit_test_setup_teardown( test_recv_update_link_status_request, setup_service_management, teardown_service_management ),
 
   };
 
