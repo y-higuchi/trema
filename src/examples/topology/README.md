@@ -6,7 +6,7 @@ This directory includes sample application using libtopology.
 - `show_topology` is a command line application, which retrieves 
   link information from Topology daemon and print them in trema network DSL style.
 
-- `show_swith_status` is a command line application, which retrieves 
+- `show_switch_status` is a command line application, which retrieves 
   switch and port information from Topology daemon and print them to stdout.
 
 - `enable_discovery` is a command line application, which enables
@@ -27,8 +27,8 @@ This directory includes sample application using libtopology.
         +----------+                         packet out(LLDP)       +-----------+
 
 
-How to run
-----------
+How to run (show_topology/show_switch_status)
+---------------------------------------------
 
 1. Change to trema directory and build trema, if you haven't done so already. 
 
@@ -51,7 +51,7 @@ How to run
 
         $ ./trema run ./objects/examples/topology/enable_discovery
 
-4. Run show_topology/show_switch_status from trema run 
+4. (C version) Run show_topology/show_switch_status from trema run 
 
         $ ./trema run objects/examples/topology/show_topology
         $ ./trema run objects/examples/topology/show_switch_status
@@ -61,6 +61,63 @@ How to run
         $ env TREMA_HOME=`pwd` src/examples/topology/show_topology
         $ env TREMA_HOME=`pwd` src/examples/topology/show_switch_status
 
+4. (Ruby version) Run show-topology.rb/show-switch-status.rb from trema run 
+
+        $ ./trema run src/examples/topology/show-topology.rb
+        $ ./trema run src/examples/topology/show-switch-status.rb
+
+
+How to run (change-history.rb)
+------------------------------
+
+1. Change to trema directory and build trema, if you haven't done so already. 
+
+        $ cd $TREMA_HOME
+        $ ./build.rb
+
+2. Start topology daemon.
+
+        $ ./trema run -c src/examples/topology/change-history.conf &
+
+3. Run change-history.rb from trema run 
+
+        $ ./trema run src/examples/topology/change-history.rb
+
+4. Controller will output will be written to change-history.dot in current directory.
+
+        (In another terminal)
+        $ tail -F change-history.dot
+        digraph {
+          subgraph cluster0 {
+            graph [label="Gen 0\ninitial"];
+            "0x1_0" [label="0x1", color="green"];
+            "0x2_0" [label="0x2", color="green"];
+            "0x3_0" [label="0x3", color="green"];
+            "0x1_0" -> "0x2_0" [color="green"];
+            "0x1_0" -> "0x3_0" [color="green"];
+            "0x2_0" -> "0x3_0" [color="green"];
+            "0x3_0" -> "0x2_0" [color="green"];
+            "0x3_0" -> "0x1_0" [color="green"];
+            "0x2_0" -> "0x1_0" [color="green"];
+
+5. See how topology change is notified to dot file.
+   Example: stop switch with dpid 0x3
+
+        (In another terminal)
+        $ ./trema kill 0x3
+
+   Example: restart switch with dpid 0x3
+
+        $ ./trema up 0x3
+
+6. Graphically see topology change history.
+
+        $ dot -Tsvg -O change-history.dot
+        $ firefox change-history.dot.svg
+
+   You may need to install graphviz package to use dot command.
+
+        $ sudo apt-get install graphviz
 
 License & Terms
 ---------------
