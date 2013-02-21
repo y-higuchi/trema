@@ -5,9 +5,13 @@ Feature: show_switch_status example.
   show_switch_status command will query for all the switch and port information 
   that the topology daemon hold and print them to standard output.
 
+  Background: 
+    Given I cd to "../../src/examples/topology/"
+
   @slow_process
   Scenario: [C API] Show switch and port information obtained from topology.
-    Given a file named "topology.conf" with:
+    Given I compile "show_switch_status.c" into "show_switch_status"
+    Given a file named "show_switch_status.conf" with:
       """
       vswitch("topology1") { datapath_id "0xe0" }
       vhost ("host1") {
@@ -24,23 +28,11 @@ Feature: show_switch_status example.
       
       link "topology1", "host1"
       link "topology1", "host2"
-      
-      run {
-        path "../../objects/topology/topology"
-        options "--always_run_discovery"
-      }
-      
-      run {
-        path "../../objects/examples/dumper/dumper"
-      }
-      
-      event :port_status => "topology", :packet_in => "filter", :state_notify => "topology"
-      filter :lldp => "topology", :packet_in => "dumper"
       """
-    And I run `trema run -c topology.conf -d`
-    And wait until "topology" is up
-    And *** sleep 16 ***
-    When I run `trema run ../../objects/examples/topology/show_switch_status`
+    And I run `trema run ../repeater_hub/repeater-hub.rb -c show_switch_status.conf -d`
+    And I run `trema run "../../../objects/topology/topology -d"`
+    And *** sleep 4 ***
+    When I run `trema run ./show_switch_status`
     Then the output should contain:
       """
       Switch status
@@ -50,5 +42,5 @@ Feature: show_switch_status example.
       """
       Port status
       """
-    And the output should match /dpid : 0xe0, port : 1\(.+\), status : up, external : true/
-    And the output should match /dpid : 0xe0, port : 2\(.+\), status : up, external : true/
+    And the output should match /  dpid : 0xe0, port : 1\(.+\), status : up, external : (true|false)/
+    And the output should match /  dpid : 0xe0, port : 2\(.+\), status : up, external : (true|false)/

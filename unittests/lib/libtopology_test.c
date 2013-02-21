@@ -19,7 +19,7 @@
 #include "event_handler.h"
 #include "messenger.h"
 
-
+extern bool disable_auto_start_topology_daemon;
 
 /********************************************************************************
  * Common function.
@@ -313,6 +313,13 @@ finalize_libtopology_mock() {
 
 static void
 setup() {
+  disable_auto_start_topology_daemon = true;
+}
+
+
+static void
+setup_mocks() {
+  setup();
   swap_original( add_message_requested_callback );
   swap_original( delete_message_requested_callback );
   swap_original( add_message_replied_callback );
@@ -329,13 +336,19 @@ setup() {
 
 static void
 setup_libtopology() {
-  setup();
+  setup_mocks();
   init_libtopology_mock();
 }
 
 
 static void
 teardown() {
+  disable_auto_start_topology_daemon = false;
+}
+
+
+static void
+teardown_mocks() {
   revert_original( add_message_requested_callback );
   revert_original( delete_message_requested_callback );
   revert_original( add_message_replied_callback );
@@ -347,13 +360,15 @@ teardown() {
   revert_original( delete_timer_event );
 
   revert_original( send_request_message );
+
+  teardown();
 }
 
 
 static void
 teardown_libtopology() {
   finalize_libtopology_mock();
-  teardown();
+  teardown_mocks();
 }
 
 /********************************************************************************
@@ -1275,34 +1290,34 @@ main() {
   const UnitTest tests[] = {
     unit_test( test_struct_size ),
 
-    unit_test_setup_teardown( test_init_libtopology, setup, teardown ),
-    unit_test_setup_teardown( test_second_init_libtopology_should_fail, setup, teardown ),
-    unit_test_setup_teardown( test_finalize_libtopology, setup, teardown ),
-    unit_test_setup_teardown( test_second_finalize_libtopology_should_fail, setup, teardown ),
+    unit_test_setup_teardown( test_init_libtopology, setup_mocks, teardown_mocks ),
+    unit_test_setup_teardown( test_second_init_libtopology_should_fail, setup_mocks, teardown_mocks ),
+    unit_test_setup_teardown( test_finalize_libtopology, setup_mocks, teardown_mocks ),
+    unit_test_setup_teardown( test_second_finalize_libtopology_should_fail, setup_mocks, teardown_mocks ),
 
-    unit_test_setup_teardown( test_subscribe_topology, setup, teardown ),
-    unit_test( test_duplicate_subscribe_topology ),
+    unit_test_setup_teardown( test_subscribe_topology, setup_mocks, teardown_mocks ),
+    unit_test_setup_teardown( test_duplicate_subscribe_topology, setup, teardown ),
     unit_test_setup_teardown( test_subscribe_topology_send_fail, setup_libtopology, teardown_libtopology ),
 
-    unit_test_setup_teardown( test_unsubscribe_topology, setup, teardown ),
-    unit_test( test_duplicate_unsubscribe_topology ),
+    unit_test_setup_teardown( test_unsubscribe_topology, setup_mocks, teardown_mocks ),
+    unit_test_setup_teardown( test_duplicate_unsubscribe_topology, setup, teardown ),
     unit_test_setup_teardown( test_unsubscribe_topology_send_fail, setup_libtopology, teardown_libtopology ),
 
-    unit_test( test_get_all_link_status ),
-    unit_test( test_get_all_port_status ),
-    unit_test( test_get_all_switch_status ),
+    unit_test_setup_teardown( test_get_all_link_status, setup, teardown ),
+    unit_test_setup_teardown( test_get_all_port_status, setup, teardown ),
+    unit_test_setup_teardown( test_get_all_switch_status, setup, teardown ),
 
-    unit_test( test_enable_topology_discovery ),
-    unit_test( test_disable_topology_discovery ),
+    unit_test_setup_teardown( test_enable_topology_discovery, setup, teardown ),
+    unit_test_setup_teardown( test_disable_topology_discovery, setup, teardown ),
 
-    unit_test( test_set_link_status ),
+    unit_test_setup_teardown( test_set_link_status, setup, teardown ),
     unit_test_setup_teardown( test_set_link_status_send_fail, setup_libtopology, teardown_libtopology ),
 
-    unit_test( test_add_callback_switch_status_updated ),
-    unit_test( test_add_callback_link_status_updated ),
-    unit_test( test_add_callback_port_status_updated ),
+    unit_test_setup_teardown( test_add_callback_switch_status_updated, setup, teardown ),
+    unit_test_setup_teardown( test_add_callback_link_status_updated, setup, teardown ),
+    unit_test_setup_teardown( test_add_callback_port_status_updated, setup, teardown ),
 
-    unit_test( test_respond_to_ping_from_topology ),
+    unit_test_setup_teardown( test_respond_to_ping_from_topology, setup, teardown ),
   };
   setup_leak_detector();
   return run_tests( tests );

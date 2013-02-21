@@ -25,8 +25,14 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h>
 #include "trema.h"
 #include "topology.h"
+
+bool disable_auto_start_topology_daemon = false;
 
 static char *libtopology_queue_name = NULL;
 static char *topology_name = NULL;
@@ -299,6 +305,7 @@ recv_port_status_notification( uint16_t tag, void *data, size_t len ) {
   ( *port_status_updated_callback )( port_status_updated_callback_param, s );
 }
 
+
 static void
 recv_switch_status_notification( uint16_t tag, void *data, size_t len ) {
   UNUSED( tag );
@@ -318,12 +325,11 @@ recv_switch_status_notification( uint16_t tag, void *data, size_t len ) {
   (* switch_status_updated_callback )( switch_status_updated_callback_param, switch_status );
 }
 
+
 static void
 recv_ping_request( const messenger_context_handle *handle, void *data, size_t len ) {
   UNUSED( len );
   UNUSED( data );
-
-//  topology_request *req = data;
 
   // respond to topology ping
   const size_t name_bytes = strlen( libtopology_queue_name ) + 1;
@@ -341,6 +347,7 @@ recv_ping_request( const messenger_context_handle *handle, void *data, size_t le
   }
   free_buffer( buf );
 }
+
 
 static void
 recv_topology_response( uint16_t tag, void *data, size_t len, void *param0 ) {
@@ -402,6 +409,7 @@ recv_unsubscribe_reply( uint16_t tag, void *data, size_t len, void *param0 ) {
   recv_topology_response(tag, data, len, param0);
 }
 
+
 bool
 subscribe_topology( void ( *callback )( void *user_data, topology_response *res ), void *user_data ) {
   if( is_subscribed ){
@@ -409,6 +417,7 @@ subscribe_topology( void ( *callback )( void *user_data, topology_response *res 
   }
   return send_request( TD_MSGTYPE_SUBSCRIBE_REQUEST, callback, user_data );
 }
+
 
 bool
 unsubscribe_topology( void ( *callback )( void *user_data, topology_response *res ), void *user_data ) {
@@ -418,10 +427,12 @@ unsubscribe_topology( void ( *callback )( void *user_data, topology_response *re
   return send_request( TD_MSGTYPE_UNSUBSCRIBE_REQUEST, callback, user_data );
 }
 
+
 bool
 enable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
   return send_request( TD_MSGTYPE_ENABLE_DISCOVERY_REQUEST, callback, user_data );
 }
+
 
 bool
 disable_topology_discovery( void ( *callback )( void *user_data, const topology_response *res ), void *user_data ) {
@@ -502,6 +513,7 @@ recv_status_notification( uint16_t tag, void *data, size_t len ) {
   }
 }
 
+
 static void
 recv_request( const messenger_context_handle *handle,
               uint16_t tag, void *data, size_t len ) {
@@ -516,6 +528,7 @@ recv_request( const messenger_context_handle *handle,
     warn( "%s: Unknown message type: %#x", __func__, (unsigned int)tag );
   }
 }
+
 
 static void
 check_transaction_table( void *user_data ) {
@@ -536,12 +549,98 @@ check_transaction_table( void *user_data ) {
 }
 
 
+static const char TOPOLOGY_DAEMON_PATH[] = "objects/topology/topology";
+
+static void
+maybe_start_topology_daemon( const char* service_name ) {
+  if ( disable_auto_start_topology_daemon ) return;
+
+  // topology daemon process check
+  if ( get_trema_process_from_name( service_name ) > 0 ) {
+    return;
+  }
+  // topology daemon not running
+
+  pid_t pid = fork();
+  if ( pid < 0 ) {
+    error( "Failed to fork. %s.", strerror( errno ) );
+    return;
+  }
+
+  if ( pid == 0 ) {
+    // child process
+
+    // close all open fd
+    DIR* dir = opendir( "/proc/self/fd" );
+    if ( dir == NULL ) {
+      error( "Failed to opendir. %s.", strerror( errno ) );
+    } else {
+      struct dirent *entry;
+      while ( ( entry = readdir( dir ) ) != NULL ) {
+        int openfd = atoi( entry->d_name );
+        close( openfd );
+      }
+      closedir( dir );
+      dir = NULL;
+    }
+
+    // exec
+    int in_fd = open( "/dev/null", O_RDONLY );
+    if ( in_fd != 0 ) {
+      dup2( in_fd, 0 );
+      close( in_fd );
+    }
+    int out_fd = open( "/dev/null", O_WRONLY );
+    if ( out_fd != 1 ) {
+      dup2( out_fd, 1 );
+      close( out_fd );
+    }
+    int err_fd = open( "/dev/null", O_WRONLY );
+    if ( err_fd != 2 ) {
+      dup2( err_fd, 2 );
+      close( err_fd );
+    }
+    char* daemon_path = xasprintf( "%s/%s", get_trema_home(),
+                                   TOPOLOGY_DAEMON_PATH );
+    char arg_daemonize[ ] = "-d";
+    char arg_name[ ] = "-n";
+    char* arg_name_opt = xstrdup( service_name );
+
+    char* argv[ 5 ];
+    argv[ 0 ] = daemon_path;
+    argv[ 1 ] = arg_daemonize;
+    argv[ 2 ] = arg_name;
+    argv[ 3 ] = arg_name_opt;
+    argv[ 4 ] = NULL; 
+
+    execvp( daemon_path, argv );
+    int err = errno;
+    error( "Failed to execvp: %s %s %s %s. %s.", argv[ 0 ], argv[ 1 ],
+           argv[ 2 ], argv[ 3 ], strerror( err ) );
+
+//    xfree( daemon_path );
+//    xfree( arg_name_opt );
+    UNREACHABLE();
+  } else {
+    // parent process
+    // wait for topology daemon to start
+    int try = 0;
+    const int max_try = 5;
+    while ( get_trema_process_from_name( service_name ) == -1 && ++try <= max_try ) {
+      sleep( 1 );
+    }
+  }
+}
+
+
 bool
 init_libtopology( const char *service_name ) {
   if ( topology_name != NULL || libtopology_queue_name != NULL ) {
     debug( "already initialized" );
     return false;
   }
+
+  maybe_start_topology_daemon( service_name );
 
   const size_t server_name_len = strlen( service_name ) + strlen( ".t" ) + 1;
   if ( server_name_len > MESSENGER_SERVICE_NAME_LENGTH ) {
@@ -567,6 +666,7 @@ init_libtopology( const char *service_name ) {
 
   return true;
 }
+
 
 bool
 add_callback_switch_status_updated( void ( *callback )( void *user_data,

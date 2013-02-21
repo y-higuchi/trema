@@ -9,14 +9,17 @@ This directory includes sample application using libtopology.
 - `show_swith_status` is a command line application, which retrieves 
   switch and port information from Topology daemon and print them to stdout.
 
+- `enable_discovery` is a command line application, which enables
+  link discovery feature using the topology API.
+
 
         +----------+           +-----------+           +------+    +------------------+
         |  switch  |  *    1   | packet in |  1    *   |dumper|    |show_topology/    |
         |  daemon  | --------> |  filter   | --------> |      |    |show_switch_status|
         +----------+ packet in +-----------+ packet in +------+    +------------------+
           ^ 1    ^                       |                               * ^ 
-          |      |                       |                     libtopology | 
-          |      `-------.               |                                 |
+          |      |                       |                                 | 
+          |      `-------.               |                    topology API |
           v 1            |               |                               1 v 
         +----------+     |               |   packet in(LLDP)        +-----------+
         | openflow |     |               `------------------------->| topology  |
@@ -32,19 +35,31 @@ How to run
         $ cd $TREMA_HOME
         $ ./build.rb
 
-2. Start topology daemon
+2. Start network to discover
 
-        $ ./trema run -c src/examples/topology/topology_fullmesh.conf &
+        $ ./trema run ./objects/examples/dumper/dumper -c src/examples/topology/topology_fullmesh.conf &
+ 
+   # dumper is used in the above example, only because trema cannot run without 
+   # any controller specified.
 
-3. Run show_topology/show_switch_status from trema run 
+3. Enable link discovery feature
+   by adding "--always_run_discovery" option when starting topology
+
+        $ ./trema run ./objects/examples/topology/topology -d --always_run_discovery
+
+   Or by using API call.
+
+        $ ./trema run ./objects/examples/topology/enable_discovery
+
+4. Run show_topology/show_switch_status from trema run 
 
         $ ./trema run objects/examples/topology/show_topology
         $ ./trema run objects/examples/topology/show_switch_status
 
    Or invoke each commands directly
 
-        $ env TREMA_HOME=`pwd` objects/examples/topology/show_topology
-        $ env TREMA_HOME=`pwd` objects/examples/topology/show_switch_status
+        $ env TREMA_HOME=`pwd` src/examples/topology/show_topology
+        $ env TREMA_HOME=`pwd` src/examples/topology/show_switch_status
 
 
 License & Terms

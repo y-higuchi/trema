@@ -573,6 +573,12 @@ gen DirectedRule, topology_examples_objects_dir => [ topology_examples_source_di
   sys "gcc -I#{ Trema.include } -I#{ Trema.openflow } #{ var :CFLAGS } -c -o #{ t.name } #{ t.source }"
 end
 
+enable_discovery_objects = [
+  "enable_discovery.o",
+].collect do | each |
+  File.join topology_examples_objects_dir, each
+end
+
 show_topology_objects = [
   "show_topology.o",
 ].collect do | each |
@@ -586,6 +592,7 @@ show_switch_status_objects = [
 end
 
 topology_examples_binaries = {
+  "enable_discovery" => enable_discovery_objects,
   "show_topology" => show_topology_objects,
   "show_switch_status" => show_switch_status_objects,
 }
