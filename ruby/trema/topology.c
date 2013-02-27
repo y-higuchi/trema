@@ -592,11 +592,11 @@ void Init_topology( void ) {
   rb_define_protected_method( mTopology, "init_libtopology", topology_init_libtopology, 1 );
   rb_define_protected_method( mTopology, "finalize_libtopology", topology_finalize_libtopology, 0 );
 
-  rb_define_method( mTopology, "send_subscribe_topology", topology_subscribe_topology, 0 );
-  rb_define_method( mTopology, "send_unsubscribe_topology", topology_unsubscribe_topology, 0 );
+  rb_define_protected_method( mTopology, "send_subscribe_topology", topology_subscribe_topology, 0 );
+  rb_define_protected_method( mTopology, "send_unsubscribe_topology", topology_unsubscribe_topology, 0 );
 
-  rb_define_method( mTopology, "send_enable_topology_discovery", topology_enable_topology_discovery, 0 );
-  rb_define_method( mTopology, "send_disable_topology_discovery", topology_disable_topology_discovery, 0 );
+  rb_define_protected_method( mTopology, "send_enable_topology_discovery", topology_enable_topology_discovery, 0 );
+  rb_define_protected_method( mTopology, "send_disable_topology_discovery", topology_disable_topology_discovery, 0 );
 
   rb_define_method( mTopology, "get_all_link_status", topology_send_all_link_status, 0 );
   rb_define_method( mTopology, "get_all_port_status", topology_send_all_port_status, 0 );

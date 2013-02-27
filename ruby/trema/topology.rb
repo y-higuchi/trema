@@ -19,80 +19,25 @@ require 'trema/topology/link'
 require 'trema/topology/port'
 require 'trema/topology/switch'
 
+
 module Trema
   # A module to add topology information notification capability to Controller
   module Topology
-    
     #
     # @private Just a placeholder for YARD.
     #
     def self.handler name
       # Do nothing.
     end
-    
-    # @!group Topology update event subscription control 
-    
-    #
-    # @return true if subscribed to topology update notification.
-    #
-    def subscribed?
-      return @is_subscribed
-    end
-
-
-    #
-    # @!method subscribe_topology_reply(  )
-    #
-    # @abstract send_subscribe_topology reply event handler. Override this to implement a custom handler.
-    #
-    # Will be called as a reply to send_subscribe_topology, if defined. 
-    # @return [void]
-    #
-    handler :subscribe_topology_reply
-
-
-    #
-    # @!method unsubscribe_topology_reply(  )
-    #
-    # @abstract send_unsubscribe_topology reply event handler. Override this to implement a custom handler.
-    #
-    # Will be called as a reply to send_unsubscribe_topology, if defined. 
-    # @return [void]
-    #
-    handler :unsubscribe_topology_reply
-
-
-    # @!group Discovery control
-
-    #
-    # @!method enable_topology_discovery_reply(  )
-    #
-    # @abstract send_enable_topology_discovery reply event handler. Override this to implement a custom handler.
-    #
-    # Will be called as a reply to send_enable_topology_discovery, if defined. 
-    # @return [void]
-    #
-    handler :enable_topology_discovery_reply
-
-
-    #
-    # @!method disable_topology_discovery_reply(  )
-    #
-    # @abstract send_disable_topology_discovery reply event handler. Override this to implement a custom handler.
-    #
-    # Will be called as a reply to send_disable_topology_discovery, if defined. 
-    # @return [void]
-    #
-    handler :disable_topology_discovery_reply
 
 
     # @!group Topology update event handlers
 
     #
-    # 
+    #
     # @!method switch_status_updated( sw_stat )
     # Switch status update event handler.
-    # @abstract 
+    # @abstract
     # @note In general user should override #switch_status_up and #switch_status_down,
     #       unless user have common operation for both events.
     #
@@ -105,8 +50,8 @@ module Trema
     # @return [void]
     #
     handler :switch_status_updated
-    
-    
+
+
     #
     # @overload switch_status_up( dpid )
     # Switch status up event handler.
@@ -115,8 +60,8 @@ module Trema
     # @return [void]
     #
     handler :switch_status_up
-    
-    
+
+
     #
     # @overload switch_status_down( dpid )
     # Switch status down event handler.
@@ -143,7 +88,7 @@ module Trema
     # @return [void]
     #
     handler :port_status_updated
-    
+
     #
     # @!method link_status_updated( link_stat )
     #
@@ -164,7 +109,7 @@ module Trema
 
 
     # @!group Get all status request/reply
-    
+
     #
     # @!method all_switch_status( sw_stats )
     # get_all_switch_status reply event handler,
@@ -193,7 +138,7 @@ module Trema
 
     #
     # @!method all_link_status( link_stat )
-    # get_all_link_status reply event handler, 
+    # get_all_link_status reply event handler,
     # when handler block was omitted on get_all_link_status call.
     # @abstract
     #
@@ -203,9 +148,10 @@ module Trema
     # @return [void]
     #
     handler :all_link_status
-    
+
     # @!endgroup
-    
+
+
     #
     # @!method start
     # Initialize topology as controller start.
@@ -235,27 +181,89 @@ module Trema
 
     #
     # @!method shutdown!
-    # Finalize topology before stopping trema.  
+    # Finalize topology before stopping trema.
     #
     def shutdown!
       finalize_libtopology
       super()
     end
 
+
     #######################
     protected
     #######################
 
+
+    # @!group Topology update event subscription control
+
+
+    #
+    # @return true if subscribed to topology update notification.
+    #
+    def subscribed?
+      return @is_subscribed
+    end
+
+
+    #
+    # @!method subscribe_topology_reply(  )
+    #
+    # @abstract send_subscribe_topology reply event handler. Override this to implement a custom handler.
+    #
+    # Will be called as a reply to send_subscribe_topology, if defined.
+    # @return [void]
+    #
+    handler :subscribe_topology_reply
+
+
+    #
+    # @!method unsubscribe_topology_reply(  )
+    #
+    # @abstract send_unsubscribe_topology reply event handler. Override this to implement a custom handler.
+    #
+    # Will be called as a reply to send_unsubscribe_topology, if defined.
+    # @return [void]
+    #
+    handler :unsubscribe_topology_reply
+
+
+    # @!group Discovery control
+
+    #
+    # @!method enable_topology_discovery_reply(  )
+    #
+    # @abstract send_enable_topology_discovery reply event handler. Override this to implement a custom handler.
+    #
+    # Will be called as a reply to send_enable_topology_discovery, if defined.
+    # @return [void]
+    #
+    handler :enable_topology_discovery_reply
+
+
+    #
+    # @!method disable_topology_discovery_reply(  )
+    #
+    # @abstract send_disable_topology_discovery reply event handler. Override this to implement a custom handler.
+    #
+    # Will be called as a reply to send_disable_topology_discovery, if defined.
+    # @return [void]
+    #
+    handler :disable_topology_discovery_reply
+
+    # @!endgroup
+
+
     #
     # @return true if there exist a definition for topology update event handler
-    # 
+    #
     def topology_handler_implemented?
       return respond_to?( :switch_status_up ) | respond_to?( :switch_status_down ) |
              respond_to?( :switch_status_updated ) |
              respond_to?( :port_status_updated ) |
              respond_to?( :link_status_updated )
     end
-    
+
+
     def _switch_status_updated sw
       switch_status_up sw[:dpid] if respond_to?( :switch_status_up ) and sw[:up]
       switch_status_updated sw if respond_to?( :switch_status_updated )
