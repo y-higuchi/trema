@@ -70,6 +70,37 @@ def send_packets source, dest, options = {}
 end
 
 
+def wait_until_all_pid_files_are_deleted timeout = 10
+  elapsed = 0
+  loop do
+    raise "Failed to clean up remaining processes." if elapsed > timeout
+    break if Dir.glob( File.join( Trema.pid, "*.pid" ) ).empty?
+    sleep 1
+    elapsed += 1
+  end
+  sleep 1
+end
+
+
+def wait_until_controller_is_up trema_name, timeout = 10
+  elapsed = 0
+  pid = 0
+  pid_file = File.join( Trema.pid, "#{ trema_name }.pid" )
+  begin
+    line = File.read( pid_file ) || "0"
+    pid = line.chomp.to_i
+    if pid != 0
+      pid = 0 if Process.kill( 0, pid ) != 1
+    end
+  rescue
+  ensure
+    sleep 1
+    elapsed += 1
+    raise "Timed out waiting for #{ trema_name }." if elapsed > timeout
+  end until pid != 0
+end
+
+
 include Trema::Util
 
 
@@ -127,14 +158,14 @@ class Network
     @th_controller = Thread.start do
       controller.run!
     end
-    sleep 5  # FIXME: wait until controller.up?
+    wait_until_controller_is_up app_name
   end
 
 
   def trema_kill
     cleanup_current_session
     @th_controller.join if @th_controller
-    sleep 5  # FIXME: wait until switch_manager.down?
+    wait_until_all_pid_files_are_deleted
   end
 
 
