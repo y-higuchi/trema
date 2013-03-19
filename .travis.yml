@@ -16,4 +16,4 @@ before_install:
  - gem install bundler
 
 notifications:
-  webhooks: http://trema-hubot.herokuapp.com/hubot/travis?room=1
+#  webhooks: http://trema-hubot.herokuapp.com/hubot/travis?room=1
