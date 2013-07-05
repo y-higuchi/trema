@@ -149,9 +149,10 @@ module Trema
     #
     handler :all_link_status
 
+    #
     # @!endgroup
-
-
+    #
+    #
     #
     # @!method start
     # Initialize topology as controller start.
