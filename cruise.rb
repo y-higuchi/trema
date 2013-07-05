@@ -34,7 +34,6 @@ $coverage_threshold = 70.2
 $LOAD_PATH.unshift( File.expand_path( File.dirname( __FILE__ ) + "/ruby" ) )
 
 require "rubygems"
-require "bundler/setup"
 
 require "English"
 require "blocker"
@@ -187,7 +186,7 @@ def gcov gcda, dir
     shell.on_stdout do | l |
       file = File.expand_path( $1 ) if /^File '(.*)'/=~ l
       testee = $c_files[ file ]
-      if /^Lines executed:(.*)% of (.*)$/=~ l
+      if /^Lines executed:(.*)% of (.*)$/=~ l and not testee.nil?
         testee.coverage = $1.to_f
         testee.lines = $2.to_i
       end
@@ -359,6 +358,7 @@ $options.parse! ARGV
 
 
 def init_cruise
+  sh "bundle"
   sh "rake setup"
 end
 

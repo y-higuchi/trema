@@ -17,7 +17,7 @@
 
 
 module Trema
-  VERSION = "0.3.17"
+  VERSION = "0.3.20"
 end
 
 

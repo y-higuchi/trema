@@ -39,13 +39,9 @@ Feature: C function example command "add_forward_entry"
         -t, --type={vendor,packet_in,port_status,state_notify} Specify event type.
       """
 
+  @slow_process
   Scenario Outline: Add 'mirror' to All Switch Manager/Daemon's event forwarding entries of packet_in
-    Given a file named "nw_dsl.conf" with:
-      """
-      vswitch { datapath_id 0x1 }
-      vswitch { datapath_id 0x2 }
-      """
-    And I successfully run `trema run ../repeater_hub/repeater-hub.rb -c nw_dsl.conf -d`
+    Given I successfully run `trema run ../repeater_hub/repeater-hub.rb -c network.conf -d`
     And wait until "RepeaterHub" is up
     When I successfully run `trema run './add_forward_entry -t packet_in mirror'`
     Then the output should contain "Operation Succeeded."
@@ -60,13 +56,9 @@ Feature: C function example command "add_forward_entry"
       | SW 0x1 | -s 0x1 |
       | SW 0x2 | -s 0x2 |
 
+  @slow_process
   Scenario Outline: Switch added after event forwarding entry manipulation should also reflect new configuration of Switch Manager.
-    Given a file named "nw_dsl.conf" with:
-      """
-      vswitch { datapath_id 0x1 }
-      vswitch { datapath_id 0x2 }
-      """
-    And I successfully run `trema run ../repeater_hub/repeater-hub.rb -c nw_dsl.conf -d`
+    Given I successfully run `trema run ../repeater_hub/repeater-hub.rb -c network.conf -d`
     And wait until "RepeaterHub" is up
     And I successfully run `trema run './add_forward_entry -t packet_in mirror'`
     And the output should contain "Operation Succeeded."
@@ -87,13 +79,9 @@ Feature: C function example command "add_forward_entry"
       | SW 0x1 | -s 0x1 |
       | SW 0x2 | -s 0x2 |
 
+  @slow_process
   Scenario Outline: Add 'mirror' only to Switch Manager's event forwarding entry of packet_in
-    Given a file named "nw_dsl.conf" with:
-      """
-      vswitch { datapath_id 0x1 }
-      vswitch { datapath_id 0x2 }
-      """
-    And I successfully run `trema run ../repeater_hub/repeater-hub.rb -c nw_dsl.conf -d`
+    Given I successfully run `trema run ../repeater_hub/repeater-hub.rb -c network.conf -d`
     And wait until "RepeaterHub" is up
     When I successfully run `trema run './add_forward_entry -m -t packet_in mirror'`
     Then the output should contain "Updated service name list:"
@@ -108,13 +96,9 @@ Feature: C function example command "add_forward_entry"
       | 0x1    |
       | 0x2    |
 
+  @slow_process
   Scenario Outline: Add 'mirror' only to Switch Daemon 0x1's event forwarding entries of packet_in
-    Given a file named "nw_dsl.conf" with:
-      """
-      vswitch { datapath_id 0x1 }
-      vswitch { datapath_id 0x2 }
-      """
-    And I successfully run `trema run ../repeater_hub/repeater-hub.rb -c nw_dsl.conf -d`
+    Given I successfully run `trema run ../repeater_hub/repeater-hub.rb -c network.conf -d`
     And wait until "RepeaterHub" is up
     When I successfully run `trema run './add_forward_entry -s 0x1 -t packet_in mirror'`
     Then the output should contain "Updated service name list:"
